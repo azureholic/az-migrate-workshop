@@ -1,0 +1,11 @@
+# Exclude ISO files (large binaries)
+*.iso
+
+# Common PowerShell/Windows artifacts
+*.log
+*.tmp
+*.bak
+~$*
+
+# Azure CLI output
+*.json.tmp

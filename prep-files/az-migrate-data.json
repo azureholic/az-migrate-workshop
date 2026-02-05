@@ -1,0 +1,7 @@
+{
+  "azureMigrateAppliance": {
+    "downloadUrl": "https://go.microsoft.com/fwlink/?linkid=2191848",
+    "sha256": "42CF83E265D54E4D014658DAB36457C83B630A2EA22C8150AD41C607DE7A0476",
+    "fileName": "AzureMigrateAppliance.zip"
+  }
+}
