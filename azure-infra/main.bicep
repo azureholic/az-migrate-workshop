@@ -96,6 +96,18 @@ resource migrateProject 'Microsoft.Migrate/migrateProjects@2020-05-01' = {
   }
 }
 
+// Grant Azure Migrate project access to the replication storage account
+// Storage Blob Data Contributor role (ba92f5b4-2d11-453d-a403-e96b0029c9fe)
+resource migrateStorageRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(replicationStorageAccount.id, migrateProject.id, 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+  scope: replicationStorageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+    principalId: migrateProject.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // Solutions are created via ARM deployment since Bicep doesn't have direct resource type
 // We use deploymentScripts or nested templates. For simplicity, we'll create them via REST in the deploy script.
 // The migrate project needs these solutions to function properly:
