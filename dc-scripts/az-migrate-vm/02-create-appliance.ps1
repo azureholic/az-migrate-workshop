@@ -7,7 +7,7 @@ param(
     [string]$ExtractPath = "C:\VMs",
     [int64]$MemoryStartupBytes = 8GB,
     [int]$ProcessorCount = 2,
-    [string]$SwitchName = "External-Switch"
+    [string]$SwitchName = "NAT-Switch"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -120,31 +120,20 @@ if (-not (Test-Path $vmConfigPath) -or -not (Test-Path $vhdPath)) {
 Write-Host "VM export validated: $vmExportPath" -ForegroundColor Green
 
 # ============================================
-# 3. Configure Virtual Switch
+# 3. Verify NAT Virtual Switch
 # ============================================
-Write-Host "`n[3/5] Configuring virtual switch..." -ForegroundColor Yellow
+Write-Host "`n[3/5] Verifying NAT virtual switch..." -ForegroundColor Yellow
 
-# Check if switch exists
+# NAT switch should be created by 02-prep-dc.ps1
 $existingSwitch = Get-VMSwitch -Name $SwitchName -ErrorAction SilentlyContinue
 
 if ($existingSwitch) {
-    Write-Host "Virtual switch already exists: $SwitchName" -ForegroundColor Gray
+    Write-Host "NAT switch found: $SwitchName" -ForegroundColor Green
     Write-Host "  Type: $($existingSwitch.SwitchType)" -ForegroundColor Gray
 } else {
-    Write-Host "Creating new external virtual switch..." -ForegroundColor Cyan
-    
-    # Get the first physical network adapter
-    $netAdapter = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.Physical } | Select-Object -First 1
-    
-    if ($netAdapter) {
-        Write-Host "Using network adapter: $($netAdapter.Name)" -ForegroundColor Gray
-        New-VMSwitch -Name $SwitchName -NetAdapterName $netAdapter.Name -AllowManagementOS $true
-        Write-Host "Virtual switch created: $SwitchName" -ForegroundColor Green
-    } else {
-        Write-Host "WARNING: No physical network adapter found, creating internal switch" -ForegroundColor Yellow
-        New-VMSwitch -Name $SwitchName -SwitchType Internal
-        Write-Host "Internal switch created: $SwitchName" -ForegroundColor Green
-    }
+    Write-Host "ERROR: NAT switch not found: $SwitchName" -ForegroundColor Red
+    Write-Host "Please ensure 02-prep-dc.ps1 was run successfully" -ForegroundColor Yellow
+    exit 1
 }
 
 # ============================================

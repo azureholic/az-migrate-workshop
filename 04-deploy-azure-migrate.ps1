@@ -1,23 +1,80 @@
-# Azure Migration Workshop - Deploy Azure Migrate Appliance
-# This script orchestrates Azure Migrate appliance deployment on the DC host
+# Azure Migration Workshop - Deploy Azure Migrate
+# This script orchestrates (in parallel):
+# 1. Azure Migrate infrastructure deployment (project, vault, storage, target VNet)
+# 2. Azure Migrate appliance deployment on the DC host (download + Hyper-V import)
+# Then creates a Hyper-V discovery site and prints the appliance registration key.
 
 param(
     [string]$ResourceGroupName = "rg-migrate-workshop",
     [string]$VMName = "vm-dc",
     [string]$ScriptsPath = ".\dc-scripts\az-migrate-vm",
-    [string]$VMFilesPath = "C:\dc-files"
+    [string]$VMFilesPath = "C:\dc-files",
+    [string]$AzureInfraTemplate = ".\azure-infra\main.bicep",
+    [string]$AzureInfraParams = ".\azure-infra\main.bicepparam",
+    [string]$Location = "swedencentral",
+    [string]$HyperVSiteName = "hyperv-site"
 )
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "`n=== Azure Migration Workshop - Deploy Azure Migrate Appliance ===" -ForegroundColor Yellow
+Write-Host "`n=== Azure Migration Workshop - Deploy Azure Migrate ===" -ForegroundColor Yellow
 Write-Host "Resource Group: $ResourceGroupName" -ForegroundColor Cyan
-Write-Host "VM Name: $VMName`n" -ForegroundColor Cyan
+Write-Host "VM Name: $VMName" -ForegroundColor Cyan
+Write-Host "Location: $Location`n" -ForegroundColor Cyan
+
+# Helper: run a script on the DC VM via az vm run-command and check for errors
+function Invoke-RunCommand {
+    param(
+        [string]$ScriptFile,
+        [string[]]$Parameters,
+        [string]$StepName
+    )
+
+    $tempFile = [System.IO.Path]::GetTempFileName() + ".ps1"
+    try {
+        Get-Content -Path $ScriptFile -Raw | Out-File -FilePath $tempFile -Encoding UTF8
+
+        $cmdArgs = @(
+            "vm", "run-command", "invoke",
+            "--resource-group", $ResourceGroupName,
+            "--name", $VMName,
+            "--command-id", "RunPowerShellScript",
+            "--scripts", "@$tempFile",
+            "--output", "json"
+        )
+        if ($Parameters) {
+            $cmdArgs += "--parameters"
+            $cmdArgs += $Parameters
+        }
+
+        $output = & az @cmdArgs 2>$null
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: az vm run-command failed for '$StepName' (exit code $LASTEXITCODE)" -ForegroundColor Red
+            exit 1
+        }
+
+        $result = ($output | ConvertFrom-Json).value
+        $stdOut = ($result | Where-Object { $_.code -like '*StdOut*' }).message
+        $stdErr = ($result | Where-Object { $_.code -like '*StdErr*' }).message
+
+        if ($stdOut) { Write-Host $stdOut -ForegroundColor Gray }
+
+        if ($stdErr -and $stdErr.Trim().Length -gt 0) {
+            Write-Host "`nVM script stderr output:" -ForegroundColor Yellow
+            Write-Host $stdErr -ForegroundColor Red
+            Write-Host "ERROR: '$StepName' failed on the VM" -ForegroundColor Red
+            exit 1
+        }
+    } finally {
+        Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+    }
+}
 
 # ============================================
-# 1. Verify scripts exist
+# 1. Verify scripts and templates exist
 # ============================================
-Write-Host "[1/2] Checking scripts..." -ForegroundColor Yellow
+Write-Host "[1/5] Checking scripts and templates..." -ForegroundColor Yellow
 
 if (-not (Test-Path $ScriptsPath)) {
     Write-Host "ERROR: Scripts directory not found: $ScriptsPath" -ForegroundColor Red
@@ -27,114 +84,292 @@ if (-not (Test-Path $ScriptsPath)) {
 $script1 = Join-Path $ScriptsPath "01-download-appliance.ps1"
 $script2 = Join-Path $ScriptsPath "02-create-appliance.ps1"
 
-if (-not (Test-Path $script1)) {
-    Write-Host "ERROR: Script not found: $script1" -ForegroundColor Red
+foreach ($s in @($script1, $script2)) {
+    if (-not (Test-Path $s)) {
+        Write-Host "ERROR: Script not found: $s" -ForegroundColor Red
+        exit 1
+    }
+}
+
+if (-not (Test-Path $AzureInfraTemplate)) {
+    Write-Host "ERROR: Bicep template not found: $AzureInfraTemplate" -ForegroundColor Red
     exit 1
 }
 
-if (-not (Test-Path $script2)) {
-    Write-Host "ERROR: Script not found: $script2" -ForegroundColor Red
+if (-not (Test-Path $AzureInfraParams)) {
+    Write-Host "ERROR: Parameters file not found: $AzureInfraParams" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "Found required scripts" -ForegroundColor Green
+Write-Host "All required scripts and templates found" -ForegroundColor Green
 
 # ============================================
-# 2. Download Azure Migrate Appliance on VM
+# 1b. Check if Azure Migrate appliance VM already exists
 # ============================================
-Write-Host "`n[1/2] Downloading Azure Migrate Appliance ZIP on VM..." -ForegroundColor Cyan
-Write-Host "Target location on VM: $VMFilesPath" -ForegroundColor Gray
-Write-Host "(This may take a while - ZIP is several GB)`n" -ForegroundColor Yellow
+Write-Host "`nChecking if Azure Migrate appliance VM already exists on DC host..." -ForegroundColor Gray
 
-$script1Content = Get-Content -Path $script1 -Raw
+$vmCheckOutput = az vm run-command invoke `
+    --resource-group $ResourceGroupName `
+    --name $VMName `
+    --command-id RunPowerShellScript `
+    --scripts "if (Get-VM -Name 'az-migrate' -ErrorAction SilentlyContinue) { Write-Host 'EXISTS' } else { Write-Host 'NOTFOUND' }" `
+    --output json 2>$null
 
-try {
-    # Save script to temp file
-    $tempScriptFile = [System.IO.Path]::GetTempFileName() + ".ps1"
-    $script1Content | Out-File -FilePath $tempScriptFile -Encoding UTF8
-    
-    # Execute on VM
-    $output = az vm run-command invoke `
+$vmCheckResult = ($vmCheckOutput | ConvertFrom-Json).value | Where-Object { $_.code -like '*StdOut*' } | Select-Object -ExpandProperty message
+$applianceVMExists = $vmCheckResult.Trim() -eq 'EXISTS'
+
+if ($applianceVMExists) {
+    Write-Host "Azure Migrate appliance VM already exists in Hyper-V - skipping download and import" -ForegroundColor Green
+} else {
+    Write-Host "Appliance VM not found - will deploy" -ForegroundColor Gray
+}
+
+# ============================================
+# 2. Start Azure infrastructure deployment (parallel)
+# ============================================
+Write-Host "`n[2/5] Starting Azure Migrate infrastructure deployment..." -ForegroundColor Yellow
+
+# Register Microsoft.OffAzure provider (needed for Hyper-V site later)
+Write-Host "Registering Microsoft.OffAzure resource provider..." -ForegroundColor Gray
+az provider register --namespace Microsoft.OffAzure --output none 2>&1 | Out-Null
+
+$deploymentName = "azure-migrate-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+Write-Host "Deployment: $deploymentName" -ForegroundColor Gray
+Write-Host "Template: $AzureInfraTemplate" -ForegroundColor Gray
+
+az deployment group create `
+    --resource-group $ResourceGroupName `
+    --name $deploymentName `
+    --template-file $AzureInfraTemplate `
+    --parameters $AzureInfraParams `
+    --no-wait `
+    --output none
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: Failed to start Azure infrastructure deployment" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Azure infrastructure deployment started in background" -ForegroundColor Green
+Write-Host "Proceeding with appliance deployment on DC VM in parallel...`n" -ForegroundColor Cyan
+
+# ============================================
+# 3. Download Azure Migrate Appliance on DC VM
+# ============================================
+if ($applianceVMExists) {
+    Write-Host "[3/5] Skipping appliance download - VM already exists" -ForegroundColor Gray
+} else {
+    Write-Host "[3/5] Downloading Azure Migrate Appliance ZIP on DC VM..." -ForegroundColor Yellow
+    Write-Host "Target: $VMFilesPath on $VMName" -ForegroundColor Gray
+    Write-Host "(This may take a while - ZIP is several GB)`n" -ForegroundColor Yellow
+
+    Invoke-RunCommand -ScriptFile $script1 -Parameters "TargetPath=$VMFilesPath" -StepName "Download appliance"
+    Write-Host "`nAppliance download completed!" -ForegroundColor Green
+}
+
+# ============================================
+# 4. Extract and Import Azure Migrate VM in Hyper-V
+# ============================================
+if ($applianceVMExists) {
+    Write-Host "[4/5] Skipping appliance import - VM already exists" -ForegroundColor Gray
+} else {
+    Write-Host "`n[4/5] Extracting and importing Azure Migrate VM in Hyper-V..." -ForegroundColor Yellow
+    Write-Host "This will extract the ZIP and import the VM into Hyper-V`n" -ForegroundColor Gray
+
+    Invoke-RunCommand -ScriptFile $script2 -StepName "Import appliance VM"
+    Write-Host "`nAppliance VM import completed!" -ForegroundColor Green
+}
+
+# ============================================
+# 5. Wait for Azure deployment + generate key
+# ============================================
+Write-Host "`n[5/5] Waiting for Azure infrastructure deployment to complete..." -ForegroundColor Yellow
+
+# Wait for Bicep deployment to finish
+az deployment group wait `
+    --resource-group $ResourceGroupName `
+    --name $deploymentName `
+    --created `
+    --timeout 1800 2>&1 | Out-Null
+
+$deployState = az deployment group show `
+    --resource-group $ResourceGroupName `
+    --name $deploymentName `
+    --query "properties.provisioningState" `
+    --output tsv
+
+if ($deployState -ne "Succeeded") {
+    Write-Host "ERROR: Azure infrastructure deployment failed (state: $deployState)" -ForegroundColor Red
+    az deployment group show `
         --resource-group $ResourceGroupName `
-        --name $VMName `
-        --command-id RunPowerShellScript `
-        --scripts "@$tempScriptFile" `
-        --parameters "TargetPath=$VMFilesPath" `
-        --output json 2>&1
+        --name $deploymentName `
+        --query "properties.error" --output json
+    exit 1
+}
+
+Write-Host "Azure infrastructure deployed successfully!" -ForegroundColor Green
+
+# Retrieve deployment outputs
+$deployOutputJson = az deployment group show `
+    --resource-group $ResourceGroupName `
+    --name $deploymentName `
+    --query "properties.outputs" `
+    --output json
+
+$deployOutput = $deployOutputJson | ConvertFrom-Json
+$MigrateProjectName = $deployOutput.migrateProjectName.value
+
+# Create Azure Migrate solutions (required for discovery/assessment/migration to work)
+Write-Host "`nCreating Azure Migrate solutions..." -ForegroundColor Yellow
+
+$subscriptionId = az account show --query id --output tsv
+$solutionsBaseUri = "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Migrate/migrateProjects/$MigrateProjectName/solutions"
+
+$solutions = @(
+    @{
+        name = "Servers-Discovery-ServerDiscovery"
+        body = @{
+            properties = @{
+                tool = "ServerDiscovery"
+                goal = "Servers"
+                purpose = "Discovery"
+                status = "Inactive"
+            }
+        }
+    },
+    @{
+        name = "Servers-Assessment-ServerAssessment"
+        body = @{
+            properties = @{
+                tool = "ServerAssessment"
+                goal = "Servers"
+                purpose = "Assessment"
+                status = "Active"
+            }
+        }
+    },
+    @{
+        name = "Servers-Migration-ServerMigration"
+        body = @{
+            properties = @{
+                tool = "ServerMigration"
+                goal = "Servers"
+                purpose = "Migration"
+                status = "Active"
+            }
+        }
+    }
+)
+
+foreach ($solution in $solutions) {
+    $solutionUri = "$solutionsBaseUri/$($solution.name)?api-version=2018-09-01-preview"
+    $solutionBody = $solution.body | ConvertTo-Json -Depth 5 -Compress
+    $tempBodyFile = [System.IO.Path]::GetTempFileName()
+    [System.IO.File]::WriteAllText($tempBodyFile, $solutionBody)
     
-    # Clean up temp file
-    Remove-Item $tempScriptFile -Force -ErrorAction SilentlyContinue
-    
-    # Parse and display output
-    $result = $output | ConvertFrom-Json
-    $stdOut = $result.value | Where-Object { $_.code -like '*StdOut*' } | Select-Object -ExpandProperty message
-    Write-Host $stdOut -ForegroundColor Gray
-    
+    try {
+        az rest --method put --uri $solutionUri --body "@$tempBodyFile" --output none 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "  Created solution: $($solution.name)" -ForegroundColor Green
+        } else {
+            Write-Host "  Warning: Could not create solution: $($solution.name)" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "  Warning: Error creating solution $($solution.name): $_" -ForegroundColor Yellow
+    }
+    Remove-Item $tempBodyFile -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host "Solutions created" -ForegroundColor Green
+
+Write-Host "`nDeployed Azure resources:" -ForegroundColor Cyan
+Write-Host "  Migrate Project:  $($deployOutput.migrateProjectName.value)" -ForegroundColor Gray
+Write-Host "  Recovery Vault:   $($deployOutput.recoveryVaultName.value)" -ForegroundColor Gray
+Write-Host "  Target VNet:      $($deployOutput.targetVnetName.value)" -ForegroundColor Gray
+Write-Host "  Storage Account:  $($deployOutput.replicationStorageAccountName.value)" -ForegroundColor Gray
+
+# --- Create Hyper-V discovery site and generate appliance key ---
+Write-Host "`nCreating Hyper-V discovery site..." -ForegroundColor Yellow
+
+# Ensure Microsoft.OffAzure provider is registered
+$providerState = az provider show --namespace Microsoft.OffAzure --query "registrationState" --output tsv
+if ($providerState -ne "Registered") {
+    Write-Host "Waiting for Microsoft.OffAzure provider registration..." -ForegroundColor Gray
+    az provider register --namespace Microsoft.OffAzure --wait --output none
+}
+
+# Build the discovery solution ID that links the site to the migrate project
+$discoverySolutionId = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Migrate/migrateProjects/$MigrateProjectName/solutions/Servers-Discovery-ServerDiscovery"
+
+# Create the Hyper-V site via REST API
+$siteUri = "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.OffAzure/HyperVSites/${HyperVSiteName}?api-version=2023-06-06"
+
+$siteBody = @{
+    location   = $Location
+    properties = @{
+        discoverySolutionId = $discoverySolutionId
+    }
+} | ConvertTo-Json -Depth 5 -Compress
+
+# Write body to temp file to avoid PowerShell/CLI quoting issues
+$tempBodyFile = [System.IO.Path]::GetTempFileName()
+[System.IO.File]::WriteAllText($tempBodyFile, $siteBody)
+
+$siteCreated = $false
+try {
+    az rest --method put --uri $siteUri --body "@$tempBodyFile" --output none 2>$null
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "`nAzure Migrate appliance download completed!" -ForegroundColor Green
-    } else {
-        Write-Host "`nWarning: Command may have completed with errors" -ForegroundColor Yellow
+        Write-Host "Hyper-V site '$HyperVSiteName' created and linked to project" -ForegroundColor Green
+        $siteCreated = $true
     }
 } catch {
-    Write-Host "ERROR: Failed to execute command on VM: $_" -ForegroundColor Red
-    exit 1
+    Write-Host "Warning: Could not create site linked to project, trying unlinked..." -ForegroundColor Yellow
 }
+Remove-Item $tempBodyFile -Force -ErrorAction SilentlyContinue
 
-# ============================================
-# 3. Extract and Import Azure Migrate VM in Hyper-V
-# ============================================
-Write-Host "`n[2/2] Extracting and importing Azure Migrate VM in Hyper-V..." -ForegroundColor Cyan
-Write-Host "This will extract the ZIP and import the VM`n" -ForegroundColor Gray
+# Fallback: create unlinked site if linked creation failed
+if (-not $siteCreated) {
+    $siteBodySimple = @{
+        location   = $Location
+        properties = @{}
+    } | ConvertTo-Json -Compress
 
-$script2Content = Get-Content -Path $script2 -Raw
+    $tempBodyFile = [System.IO.Path]::GetTempFileName()
+    [System.IO.File]::WriteAllText($tempBodyFile, $siteBodySimple)
 
-try {
-    # Save script to temp file
-    $tempScriptFile = [System.IO.Path]::GetTempFileName() + ".ps1"
-    $script2Content | Out-File -FilePath $tempScriptFile -Encoding UTF8
-    
-    # Execute on VM
-    $output = az vm run-command invoke `
-        --resource-group $ResourceGroupName `
-        --name $VMName `
-        --command-id RunPowerShellScript `
-        --scripts "@$tempScriptFile" `
-        --output json 2>&1
-    
-    # Clean up temp file
-    Remove-Item $tempScriptFile -Force -ErrorAction SilentlyContinue
-    
-    # Parse and display output
-    $result = $output | ConvertFrom-Json
-    $stdOut = $result.value | Where-Object { $_.code -like '*StdOut*' } | Select-Object -ExpandProperty message
-    Write-Host $stdOut -ForegroundColor Gray
-    
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "`nAzure Migrate VM extraction and import completed!" -ForegroundColor Green
-    } else {
-        Write-Host "`nWarning: Command may have completed with errors" -ForegroundColor Yellow
+    try {
+        az rest --method put --uri $siteUri --body "@$tempBodyFile" --output none 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "Hyper-V site '$HyperVSiteName' created (unlinked)" -ForegroundColor Green
+            $siteCreated = $true
+        }
+    } catch {
+        Write-Host "ERROR: Failed to create Hyper-V site: $_" -ForegroundColor Red
     }
-} catch {
-    Write-Host "ERROR: Failed to execute command on VM: $_" -ForegroundColor Red
-    exit 1
+    Remove-Item $tempBodyFile -Force -ErrorAction SilentlyContinue
 }
 
 # ============================================
 # Summary
 # ============================================
-Write-Host "`n=== Azure Migrate Appliance Deployment Complete ===" -ForegroundColor Yellow
-Write-Host "Azure Migrate appliance VM is now running on the DC host" -ForegroundColor Cyan
-Write-Host "`nWhat was deployed:" -ForegroundColor Yellow
-Write-Host "1. Downloaded Azure Migrate appliance ZIP to C:\dc-files" -ForegroundColor Cyan
-Write-Host "2. Extracted ZIP to C:\VMs (version-specific folder)" -ForegroundColor Cyan
-Write-Host "3. Imported VM 'az-migrate' in Hyper-V with:" -ForegroundColor Cyan
-Write-Host "   - 2 vCPUs, 8GB RAM (static)" -ForegroundColor Gray
-Write-Host "   - Connected to External-Switch" -ForegroundColor Gray
-Write-Host "4. VM is started and ready for configuration" -ForegroundColor Cyan
+Write-Host "`n=== Azure Migrate Deployment Complete ===" -ForegroundColor Yellow
+
+Write-Host "`nAzure Resources:" -ForegroundColor Yellow
+Write-Host "  - Migrate Project:  $($deployOutput.migrateProjectName.value)" -ForegroundColor Cyan
+Write-Host "  - Hyper-V Site:     $HyperVSiteName" -ForegroundColor Cyan
+Write-Host "  - Recovery Vault:   $($deployOutput.recoveryVaultName.value)" -ForegroundColor Cyan
+Write-Host "  - Target VNet:      $($deployOutput.targetVnetName.value)" -ForegroundColor Cyan
+Write-Host "  - Storage Account:  $($deployOutput.replicationStorageAccountName.value)" -ForegroundColor Cyan
+
+Write-Host "`nAppliance VM on DC host:" -ForegroundColor Yellow
+Write-Host "  - Downloaded and imported into Hyper-V" -ForegroundColor Cyan
+Write-Host "  - VM 'az-migrate' running (2 vCPUs, 8GB RAM, NAT-Switch)" -ForegroundColor Cyan
+
 Write-Host "`nNext Steps:" -ForegroundColor Yellow
 Write-Host "1. Connect to DC VM via Azure Bastion" -ForegroundColor Cyan
 Write-Host "2. Open Hyper-V Manager and connect to 'az-migrate' VM" -ForegroundColor Cyan
-Write-Host "3. Complete Azure Migrate appliance configuration wizard" -ForegroundColor Cyan
-Write-Host "4. Register the appliance with your Azure Migrate project" -ForegroundColor Cyan
+Write-Host "3. Generate appliance key in Azure Portal:" -ForegroundColor Cyan
+Write-Host "   Azure Migrate > Servers, databases and web apps > Discover > Generate Key" -ForegroundColor Gray
+Write-Host "4. Complete the Azure Migrate appliance configuration wizard" -ForegroundColor Cyan
 Write-Host "5. Configure discovery for the Ubuntu VM" -ForegroundColor Cyan
 Write-Host ""

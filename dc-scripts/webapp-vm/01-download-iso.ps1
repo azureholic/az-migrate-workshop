@@ -1,15 +1,15 @@
-# Download Ubuntu 24.04 Autoinstall ISO
+# Download Ubuntu 24.04 Webapp Autoinstall ISO
 # This script runs on the DC VM
-# Downloads a pre-built autoinstall ISO from Azure blob storage
+# Downloads a pre-built autoinstall ISO with webapp configuration
 
 param(
     [string]$TargetPath = "C:\dc-files",
-    [string]$IsoUrl = "https://saazhpublic.blob.core.windows.net/pub/ubuntu-24.04.3-autoinstall.iso"
+    [string]$IsoUrl = "https://saazhpublic.blob.core.windows.net/pub/ubuntu-24.04.3-webapp-autoinstall.iso"
 )
 
 $ErrorActionPreference = 'Stop'
 
-Write-Host "=== Download Ubuntu 24.04 Server ISO ===" -ForegroundColor Yellow
+Write-Host "=== Download Ubuntu 24.04 Webapp Server ISO ===" -ForegroundColor Yellow
 Write-Host "Target: $TargetPath`n" -ForegroundColor Cyan
 
 # Ensure target directory exists
@@ -19,7 +19,7 @@ if (-not (Test-Path $TargetPath)) {
 }
 
 # Define output file
-$isoFileName = "ubuntu-24.04.3-autoinstall.iso"
+$isoFileName = "ubuntu-24.04.3-webapp-autoinstall.iso"
 $isoPath = Join-Path $TargetPath $isoFileName
 
 # Check if ISO already exists
@@ -31,7 +31,7 @@ if (Test-Path $isoPath) {
     exit 0
 }
 
-Write-Host "Downloading Ubuntu 24.04.3 Autoinstall ISO..." -ForegroundColor Cyan
+Write-Host "Downloading Ubuntu 24.04.3 Webapp Autoinstall ISO..." -ForegroundColor Cyan
 Write-Host "Source: $IsoUrl" -ForegroundColor Gray
 Write-Host "Destination: $isoPath" -ForegroundColor Gray
 Write-Host "This may take several minutes...`n" -ForegroundColor Yellow
@@ -59,7 +59,7 @@ try {
         if ($fileSize -lt 500) {
             Write-Host "`nWARNING: File size seems too small, download may be incomplete!" -ForegroundColor Yellow
         } else {
-            Write-Host "`nUbuntu autoinstall ISO downloaded successfully!" -ForegroundColor Green
+            Write-Host "`nUbuntu webapp autoinstall ISO downloaded successfully!" -ForegroundColor Green
         }
     } else {
         Write-Host "ERROR: ISO file not found after download" -ForegroundColor Red

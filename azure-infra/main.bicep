@@ -80,31 +80,28 @@ resource recoveryVault 'Microsoft.RecoveryServices/vaults@2024-04-01' = {
   }
 }
 
-// Recovery Services Vault backup configuration
-resource backupStorageConfig 'Microsoft.RecoveryServices/vaults/backupstorageconfig@2024-04-01' = {
-  parent: recoveryVault
-  name: 'vaultstorageconfig'
-  properties: {
-    storageModelType: 'GeoRedundant'
-    crossRegionRestoreFlag: false
-  }
-}
-
-// Azure Migrate Project
+// Azure Migrate Project with System Assigned Identity
 resource migrateProject 'Microsoft.Migrate/migrateProjects@2020-05-01' = {
   name: migrateProjectName
   location: location
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
-    registeredTools: [
-      'ServerAssessment'
-      'ServerMigration'
-    ]
+    publicNetworkAccess: 'Enabled'
   }
   tags: {
     Environment: 'Migration'
     Purpose: 'Azure Migrate Workshop'
   }
 }
+
+// Solutions are created via ARM deployment since Bicep doesn't have direct resource type
+// We use deploymentScripts or nested templates. For simplicity, we'll create them via REST in the deploy script.
+// The migrate project needs these solutions to function properly:
+// - Servers-Assessment-ServerAssessment
+// - Servers-Discovery-ServerDiscovery
+// - Servers-Migration-ServerMigration
 
 // Outputs
 output migrateProjectId string = migrateProject.id

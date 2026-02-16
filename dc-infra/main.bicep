@@ -11,6 +11,42 @@ param adminPassword string
 @description('Current user object ID for blob access')
 param currentUserObjectId string = ''
 
+// NSG for default subnet - allows Bastion tunnel traffic
+resource nsg 'Microsoft.Network/networkSecurityGroups@2024-05-01' = {
+  name: 'nsg-dc-default'
+  location: location
+  properties: {
+    securityRules: [
+      {
+        name: 'Allow-Bastion-Tunnel-RDP'
+        properties: {
+          priority: 100
+          direction: 'Inbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourceAddressPrefix: '10.0.1.0/26'  // AzureBastionSubnet
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRange: '33389'
+        }
+      }
+      {
+        name: 'Allow-RDP-From-Bastion'
+        properties: {
+          priority: 110
+          direction: 'Inbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourceAddressPrefix: '10.0.1.0/26'  // AzureBastionSubnet
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRange: '3389'
+        }
+      }
+    ]
+  }
+}
+
 // VNet with 2 subnets
 module vnet 'br/public:avm/res/network/virtual-network:0.7.1' = {
   name: 'vnet-dc-deployment'
@@ -24,6 +60,7 @@ module vnet 'br/public:avm/res/network/virtual-network:0.7.1' = {
       {
         name: 'default'
         addressPrefix: '10.0.0.0/24'
+        networkSecurityGroupResourceId: nsg.id
       }
       {
         name: 'AzureBastionSubnet'
@@ -119,14 +156,14 @@ module vm 'br/public:avm/res/compute/virtual-machine:0.11.0' = {
   }
 }
 
-// Azure Bastion Basic SKU
+// Azure Bastion Standard SKU (enables tunneling for native client access)
 module bastion 'br/public:avm/res/network/bastion-host:0.7.0' = {
   name: 'bastion-dc-deployment'
   params: {
     name: 'bastion-dc'
     location: location
     virtualNetworkResourceId: vnet.outputs.resourceId
-    skuName: 'Basic'
+    skuName: 'Standard'
   }
 }
 

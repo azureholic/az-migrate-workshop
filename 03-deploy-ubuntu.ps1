@@ -1,5 +1,6 @@
 # Azure Migration Workshop - Deploy Ubuntu VM
-# This script orchestrates Ubuntu VM deployment on the DC host
+# This script orchestrates a fully unattended Ubuntu VM deployment on the DC host.
+# Uses a pre-built autoinstall ISO - single ISO, fully automated.
 
 param(
     [string]$ResourceGroupName = "rg-migrate-workshop",
@@ -14,10 +15,61 @@ Write-Host "`n=== Azure Migration Workshop - Deploy Ubuntu VM ===" -ForegroundCo
 Write-Host "Resource Group: $ResourceGroupName" -ForegroundColor Cyan
 Write-Host "VM Name: $VMName`n" -ForegroundColor Cyan
 
+# Helper: run a script on the DC VM via az vm run-command and check for errors
+function Invoke-RunCommand {
+    param(
+        [string]$ScriptFile,
+        [string[]]$Parameters,
+        [string]$StepName
+    )
+
+    $tempFile = [System.IO.Path]::GetTempFileName() + ".ps1"
+    try {
+        # Use ASCII encoding to avoid BOM issues with az vm run-command
+        Get-Content -Path $ScriptFile -Raw | Out-File -FilePath $tempFile -Encoding ASCII
+
+        $cmdArgs = @(
+            "vm", "run-command", "invoke",
+            "--resource-group", $ResourceGroupName,
+            "--name", $VMName,
+            "--command-id", "RunPowerShellScript",
+            "--scripts", "@$tempFile",
+            "--output", "json"
+        )
+        if ($Parameters) {
+            $cmdArgs += "--parameters"
+            $cmdArgs += $Parameters
+        }
+
+        $output = & az @cmdArgs 2>$null
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: az vm run-command failed for '$StepName' (exit code $LASTEXITCODE)" -ForegroundColor Red
+            exit 1
+        }
+
+        $result = ($output | ConvertFrom-Json).value
+        $stdOut = ($result | Where-Object { $_.code -like '*StdOut*' }).message
+        $stdErr = ($result | Where-Object { $_.code -like '*StdErr*' }).message
+
+        if ($stdOut) { Write-Host $stdOut -ForegroundColor Gray }
+
+        # Check for errors in stderr (ignore empty or whitespace-only)
+        if ($stdErr -and $stdErr.Trim().Length -gt 0) {
+            Write-Host "`nVM script stderr output:" -ForegroundColor Yellow
+            Write-Host $stdErr -ForegroundColor Red
+            Write-Host "ERROR: '$StepName' failed on the VM" -ForegroundColor Red
+            exit 1
+        }
+    } finally {
+        Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
 # ============================================
 # 1. Verify scripts exist
 # ============================================
-Write-Host "[1/2] Checking scripts..." -ForegroundColor Yellow
+Write-Host "[1/3] Checking scripts..." -ForegroundColor Yellow
 
 if (-not (Test-Path $ScriptsPath)) {
     Write-Host "ERROR: Scripts directory not found: $ScriptsPath" -ForegroundColor Red
@@ -40,84 +92,46 @@ if (-not (Test-Path $script2)) {
 Write-Host "Found required scripts" -ForegroundColor Green
 
 # ============================================
+# 1b. Check if Ubuntu VM already exists on DC host
+# ============================================
+Write-Host "`nChecking if Ubuntu VM already exists on DC host..." -ForegroundColor Gray
+
+$vmCheckOutput = az vm run-command invoke `
+    --resource-group $ResourceGroupName `
+    --name $VMName `
+    --command-id RunPowerShellScript `
+    --scripts "if (Get-VM -Name 'ubuntu-vm' -ErrorAction SilentlyContinue) { Write-Host 'EXISTS' } else { Write-Host 'NOTFOUND' }" `
+    --output json 2>$null
+
+$vmCheckResult = ($vmCheckOutput | ConvertFrom-Json).value | Where-Object { $_.code -like '*StdOut*' } | Select-Object -ExpandProperty message
+
+if ($vmCheckResult.Trim() -eq 'EXISTS') {
+    Write-Host "Ubuntu VM already exists in Hyper-V on the DC host - nothing to do" -ForegroundColor Green
+    Write-Host "To redeploy, first remove the VM from Hyper-V Manager on the DC host" -ForegroundColor Cyan
+    Write-Host "" 
+    exit 0
+}
+
+Write-Host "Ubuntu VM not found - proceeding with deployment" -ForegroundColor Gray
+
+# ============================================
 # 2. Download Ubuntu ISO on VM
 # ============================================
-Write-Host "`n[1/2] Downloading Ubuntu 22.04 ISO on VM..." -ForegroundColor Cyan
+Write-Host "`n[2/3] Downloading Ubuntu autoinstall ISO on VM..." -ForegroundColor Cyan
 Write-Host "Target location on VM: $VMFilesPath" -ForegroundColor Gray
-Write-Host "(This may take several minutes - ISO is ~2.5 GB)`n" -ForegroundColor Yellow
+Write-Host "(This may take several minutes)`n" -ForegroundColor Yellow
 
-$script1Content = Get-Content -Path $script1 -Raw
-
-try {
-    # Save script to temp file
-    $tempScriptFile = [System.IO.Path]::GetTempFileName() + ".ps1"
-    $script1Content | Out-File -FilePath $tempScriptFile -Encoding UTF8
-    
-    # Execute on VM
-    $output = az vm run-command invoke `
-        --resource-group $ResourceGroupName `
-        --name $VMName `
-        --command-id RunPowerShellScript `
-        --scripts "@$tempScriptFile" `
-        --parameters "TargetPath=$VMFilesPath" `
-        --output json 2>&1
-    
-    # Clean up temp file
-    Remove-Item $tempScriptFile -Force -ErrorAction SilentlyContinue
-    
-    # Parse and display output
-    $result = $output | ConvertFrom-Json
-    $stdOut = $result.value | Where-Object { $_.code -like '*StdOut*' } | Select-Object -ExpandProperty message
-    Write-Host $stdOut -ForegroundColor Gray
-    
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "`nUbuntu ISO download completed!" -ForegroundColor Green
-    } else {
-        Write-Host "`nWarning: Command may have completed with errors" -ForegroundColor Yellow
-    }
-} catch {
-    Write-Host "ERROR: Failed to execute command on VM: $_" -ForegroundColor Red
-    exit 1
-}
+Invoke-RunCommand -ScriptFile $script1 -Parameters "TargetPath=$VMFilesPath" -StepName "Download Ubuntu ISO"
+Write-Host "`nUbuntu ISO download completed!" -ForegroundColor Green
 
 # ============================================
 # 3. Create Ubuntu VM in Hyper-V
 # ============================================
-Write-Host "`n[2/2] Creating Ubuntu VM in Hyper-V..." -ForegroundColor Cyan
-Write-Host "This will create and start the VM with unattended installation`n" -ForegroundColor Gray
+Write-Host "`n[3/3] Creating Ubuntu VM in Hyper-V..." -ForegroundColor Cyan
+Write-Host "Gen 2 VM with autoinstall ISO attached`n" -ForegroundColor Gray
 
-$script2Content = Get-Content -Path $script2 -Raw
-
-try {
-    # Save script to temp file
-    $tempScriptFile = [System.IO.Path]::GetTempFileName() + ".ps1"
-    $script2Content | Out-File -FilePath $tempScriptFile -Encoding UTF8
-    
-    # Execute on VM
-    $output = az vm run-command invoke `
-        --resource-group $ResourceGroupName `
-        --name $VMName `
-        --command-id RunPowerShellScript `
-        --scripts "@$tempScriptFile" `
-        --output json 2>&1
-    
-    # Clean up temp file
-    Remove-Item $tempScriptFile -Force -ErrorAction SilentlyContinue
-    
-    # Parse and display output
-    $result = $output | ConvertFrom-Json
-    $stdOut = $result.value | Where-Object { $_.code -like '*StdOut*' } | Select-Object -ExpandProperty message
-    Write-Host $stdOut -ForegroundColor Gray
-    
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "`nUbuntu VM creation completed!" -ForegroundColor Green
-    } else {
-        Write-Host "`nWarning: Command may have completed with errors" -ForegroundColor Yellow
-    }
-} catch {
-    Write-Host "ERROR: Failed to execute command on VM: $_" -ForegroundColor Red
-    exit 1
-}
+Invoke-RunCommand -ScriptFile $script2 -StepName "Create Ubuntu VM"
+Write-Host "`nUbuntu VM creation completed!" -ForegroundColor Green
 
 # ============================================
 # Summary
@@ -125,15 +139,17 @@ try {
 Write-Host "`n=== Ubuntu VM Deployment Complete ===" -ForegroundColor Yellow
 Write-Host "Ubuntu VM is now running on the DC host with unattended installation" -ForegroundColor Cyan
 Write-Host "`nWhat happened:" -ForegroundColor Yellow
-Write-Host "1. Downloaded Ubuntu 22.04.5 LTS ISO to $VMFilesPath" -ForegroundColor Cyan
+Write-Host "1. Downloaded Ubuntu autoinstall ISO to $VMFilesPath" -ForegroundColor Cyan
 Write-Host "2. Created Ubuntu VM in Hyper-V with:" -ForegroundColor Cyan
+Write-Host "   - Generation 2 (UEFI, Secure Boot Off)" -ForegroundColor Gray
 Write-Host "   - 2 vCPUs, 2-4GB RAM" -ForegroundColor Gray
 Write-Host "   - 50GB VHD" -ForegroundColor Gray
-Write-Host "   - Ubuntu ISO + Cloud-init seed ISO attached" -ForegroundColor Gray
-Write-Host "3. VM is now installing Ubuntu automatically" -ForegroundColor Cyan
+Write-Host "   - Autoinstall ISO attached" -ForegroundColor Gray
+Write-Host "3. VM is now installing Ubuntu fully unattended" -ForegroundColor Cyan
 Write-Host "`nNext Steps:" -ForegroundColor Yellow
 Write-Host "1. Installation will take ~10-15 minutes" -ForegroundColor Cyan
 Write-Host "2. Monitor installation via Hyper-V Manager on the DC VM" -ForegroundColor Cyan
 Write-Host "3. After installation, VM will reboot and be ready to use" -ForegroundColor Cyan
-Write-Host "4. Default credentials: ubuntu / <password from cloud-init>" -ForegroundColor Cyan
+Write-Host "4. Default credentials: ubuntu / ubuntu" -ForegroundColor Cyan
+Write-Host "5. Remove the ISO from the DVD drive after the first successful reboot" -ForegroundColor Cyan
 Write-Host ""

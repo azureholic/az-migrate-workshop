@@ -1,13 +1,13 @@
-# Create Ubuntu VM in Hyper-V with Fully Unattended Setup
+# Create Ubuntu Webapp VM in Hyper-V with Fully Unattended Setup
 # This script runs on the DC VM
 # Uses Gen 2 VM (UEFI boot) with a pre-built autoinstall ISO.
 # Secure boot is disabled for Ubuntu compatibility.
 
 param(
-    [string]$VMName = "ubuntu-vm",
-    [string]$IsoPath = "C:\dc-files\ubuntu-24.04.3-autoinstall.iso",
+    [string]$VMName = "webapp-vm",
+    [string]$IsoPath = "C:\dc-files\ubuntu-24.04.3-webapp-autoinstall.iso",
     [string]$VMPath = "C:\VMs",
-    [string]$VHDPath = "C:\VMs\ubuntu-vm\ubuntu-vm.vhdx",
+    [string]$VHDPath = "C:\VMs\webapp-vm\webapp-vm.vhdx",
     [int64]$VHDSize = 50GB,
     [int64]$MemoryStartupBytes = 4GB,
     [int]$ProcessorCount = 2,
@@ -16,7 +16,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-Write-Host "=== Create Ubuntu VM in Hyper-V ===" -ForegroundColor Yellow
+Write-Host "=== Create Ubuntu Webapp VM in Hyper-V ===" -ForegroundColor Yellow
 Write-Host "VM Name: $VMName" -ForegroundColor Cyan
 Write-Host "ISO: $IsoPath" -ForegroundColor Cyan
 Write-Host "VM Path: $VMPath`n" -ForegroundColor Cyan
@@ -31,7 +31,7 @@ try {
     $hyperv = Get-WindowsFeature -Name Hyper-V
     if (-not $hyperv.Installed) {
         Write-Host "ERROR: Hyper-V is not installed!" -ForegroundColor Red
-        Write-Host "Please run 03-enable-hyperv.ps1 first" -ForegroundColor Cyan
+        Write-Host "Please run 02-prep-dc.ps1 first" -ForegroundColor Cyan
         exit 1
     }
     Write-Host "Hyper-V is installed" -ForegroundColor Green
@@ -42,11 +42,11 @@ try {
 
 # Check if Ubuntu ISO exists
 if (-not (Test-Path $IsoPath)) {
-    Write-Host "ERROR: Ubuntu ISO not found: $IsoPath" -ForegroundColor Red
+    Write-Host "ERROR: Ubuntu Webapp ISO not found: $IsoPath" -ForegroundColor Red
     Write-Host "Please run 01-download-iso.ps1 first" -ForegroundColor Cyan
     exit 1
 }
-Write-Host "Ubuntu ISO found: $IsoPath" -ForegroundColor Green
+Write-Host "Ubuntu Webapp ISO found: $IsoPath" -ForegroundColor Green
 
 # ============================================
 # 2. Create VM Directory
