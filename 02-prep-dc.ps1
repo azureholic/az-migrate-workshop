@@ -373,7 +373,8 @@ Write-Host "NAT switch configured for nested VM internet access" -ForegroundColo
 Write-Host "DHCP server configured for automatic IP assignment" -ForegroundColor Cyan
 Write-Host "Port forwarding configured for az-migrate RDP (port 33389)" -ForegroundColor Cyan
 Write-Host "`nNext Steps:" -ForegroundColor Yellow
-Write-Host "1. Run 03-deploy-ubuntu.ps1 to deploy the Ubuntu VM" -ForegroundColor Cyan
-Write-Host "2. Run 04-deploy-azure-migrate.ps1 to deploy Azure Migrate" -ForegroundColor Cyan
+Write-Host "1. Run 03-deploy-webapp.ps1 to deploy the Webapp VM" -ForegroundColor Cyan
+Write-Host "2. Run 04-deploy-ubuntu.ps1 to deploy the Ubuntu VM" -ForegroundColor Cyan
+Write-Host "3. Run 05-deploy-azure-migrate.ps1 to deploy Azure Migrate" -ForegroundColor Cyan
 Write-Host ""
 

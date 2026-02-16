@@ -16,8 +16,9 @@ Write-Host "===============================================" -ForegroundColor Cy
 Write-Host "`nThis script will set up the complete workshop environment:" -ForegroundColor Yellow
 Write-Host "  1. Deploy DC VM infrastructure (Bicep)" -ForegroundColor Gray
 Write-Host "  2. Prepare DC VM (Hyper-V, NAT, DHCP)" -ForegroundColor Gray
-Write-Host "  3. Deploy Ubuntu VM in Hyper-V" -ForegroundColor Gray
-Write-Host "  4. Deploy Azure Migrate infrastructure" -ForegroundColor Gray
+Write-Host "  3. Deploy Ubuntu Webapp VM in Hyper-V" -ForegroundColor Gray
+Write-Host "  4. Deploy Ubuntu VM in Hyper-V" -ForegroundColor Gray
+Write-Host "  5. Deploy Azure Migrate infrastructure" -ForegroundColor Gray
 Write-Host "`nResource Group: $ResourceGroupName" -ForegroundColor Cyan
 Write-Host "Location: $Location`n" -ForegroundColor Cyan
 
@@ -28,7 +29,7 @@ $stepTimings = @{}
 # ============================================
 # Step 1: Deploy DC Infrastructure
 # ============================================
-Write-Host "`n[1/4] Deploying DC VM Infrastructure..." -ForegroundColor Yellow
+Write-Host "`n[1/5] Deploying DC VM Infrastructure..." -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
 $stepStart = Get-Date
@@ -51,7 +52,7 @@ Write-Host "DC VM infrastructure deployed successfully! ($(($stepTimings["DC Dep
 # ============================================
 # Step 2: Prepare DC VM
 # ============================================
-Write-Host "`n[2/4] Preparing DC VM (Hyper-V, NAT, DHCP)..." -ForegroundColor Yellow
+Write-Host "`n[2/5] Preparing DC VM (Hyper-V, NAT, DHCP)..." -ForegroundColor Yellow
 Write-Host "=============================================" -ForegroundColor Yellow
 
 $stepStart = Get-Date
@@ -72,13 +73,36 @@ $stepTimings["DC Prep"] = (Get-Date) - $stepStart
 Write-Host "DC VM prepared successfully! ($(($stepTimings["DC Prep"]).ToString('mm\:ss')))" -ForegroundColor Green
 
 # ============================================
-# Step 3: Deploy Ubuntu VM
+# Step 3: Deploy Ubuntu Webapp VM
 # ============================================
-Write-Host "`n[3/4] Deploying Ubuntu VM in Hyper-V..." -ForegroundColor Yellow
+Write-Host "`n[3/5] Deploying Ubuntu Webapp VM in Hyper-V..." -ForegroundColor Yellow
+Write-Host "================================================" -ForegroundColor Yellow
+
+$stepStart = Get-Date
+$webappScript = Join-Path $scriptDir "03-deploy-webapp.ps1"
+if (-not (Test-Path $webappScript)) {
+    Write-Host "ERROR: Script not found: $webappScript" -ForegroundColor Red
+    exit 1
+}
+
+& $webappScript -ResourceGroupName $ResourceGroupName
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: Webapp VM deployment failed" -ForegroundColor Red
+    exit 1
+}
+
+$stepTimings["Webapp VM"] = (Get-Date) - $stepStart
+Write-Host "Webapp VM deployed successfully! ($(($stepTimings["Webapp VM"]).ToString('mm\:ss')))" -ForegroundColor Green
+
+# ============================================
+# Step 4: Deploy Ubuntu VM
+# ============================================
+Write-Host "`n[4/5] Deploying Ubuntu VM in Hyper-V..." -ForegroundColor Yellow
 Write-Host "=======================================" -ForegroundColor Yellow
 
 $stepStart = Get-Date
-$ubuntuScript = Join-Path $scriptDir "03-deploy-ubuntu.ps1"
+$ubuntuScript = Join-Path $scriptDir "04-deploy-ubuntu.ps1"
 if (-not (Test-Path $ubuntuScript)) {
     Write-Host "ERROR: Script not found: $ubuntuScript" -ForegroundColor Red
     exit 1
@@ -95,13 +119,13 @@ $stepTimings["Ubuntu"] = (Get-Date) - $stepStart
 Write-Host "Ubuntu VM deployed successfully! ($(($stepTimings["Ubuntu"]).ToString('mm\:ss')))" -ForegroundColor Green
 
 # ============================================
-# Step 4: Deploy Azure Migrate
+# Step 5: Deploy Azure Migrate
 # ============================================
-Write-Host "`n[4/4] Deploying Azure Migrate Infrastructure..." -ForegroundColor Yellow
+Write-Host "`n[5/5] Deploying Azure Migrate Infrastructure..." -ForegroundColor Yellow
 Write-Host "===============================================" -ForegroundColor Yellow
 
 $stepStart = Get-Date
-$migrateScript = Join-Path $scriptDir "04-deploy-azure-migrate.ps1"
+$migrateScript = Join-Path $scriptDir "05-deploy-azure-migrate.ps1"
 if (-not (Test-Path $migrateScript)) {
     Write-Host "ERROR: Script not found: $migrateScript" -ForegroundColor Red
     exit 1
@@ -137,6 +161,7 @@ foreach ($step in $stepTimings.GetEnumerator()) {
 Write-Host "`nWhat was deployed:" -ForegroundColor Yellow
 Write-Host "  - DC VM with nested virtualization support" -ForegroundColor Gray
 Write-Host "  - Hyper-V, NAT networking, DHCP server on DC VM" -ForegroundColor Gray
+Write-Host "  - Ubuntu Webapp VM running in Hyper-V" -ForegroundColor Gray
 Write-Host "  - Ubuntu 24.04 VM running in Hyper-V" -ForegroundColor Gray
 Write-Host "  - Azure Migrate project with all solutions" -ForegroundColor Gray
 
