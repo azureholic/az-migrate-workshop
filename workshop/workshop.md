@@ -39,31 +39,50 @@ From the repository root, run:
 
 ---
 
-## Part 2: Connect to the DC VM
+## Part 2: Connect to the VMs
 
-### 2.1 Set up the Bastion tunnel
+### 2.1 Tunnel options
 
-On your **local machine**, run:
+The `tunnel.ps1` script creates a Bastion tunnel to access VMs via RDP:
 
 ```powershell
+# Connect to Azure Migrate appliance (default) → localhost:33389
 .\tunnel.ps1
+
+# Connect to DC VM directly → localhost:3389
+.\tunnel.ps1 -Target DC
 ```
 
-This opens a Bastion tunnel on port **33389** to the DC VM.
+### 2.2 Connect to the DC VM
 
-### 2.2 Connect via RDP
-
-1. Open **Remote Desktop Connection** (mstsc)
-2. Connect to `localhost:33389`
-3. Login with the DC VM credentials:
+1. Run the tunnel script targeting the DC:
+   ```powershell
+   .\tunnel.ps1 -Target DC
+   ```
+2. Open **Remote Desktop Connection** (mstsc)
+3. Connect to `localhost:3389`
+4. Login with credentials:
    - **Username:** `azureuser`
    - **Password:** `$uper$ecretP@ssw0rd`
 
-### 2.3 Set the Azure Migrate appliance password
+### 2.3 Connect to the Azure Migrate appliance
 
-1. Open **Hyper-V Manager** on the DC VM
-2. Connect to the **az-migrate** VM
-3. Set a password for the Administrator account when prompted
+1. Run the tunnel script (defaults to AzMigrate):
+   ```powershell
+   .\tunnel.ps1
+   ```
+2. Open **Remote Desktop Connection** (mstsc)
+3. Connect to `localhost:33389`
+4. Login with the appliance credentials
+
+### 2.4 Set the Azure Migrate appliance password
+
+1. Connect to the DC VM (section 2.2)
+2. Open **Hyper-V Manager** on the DC VM
+3. Connect to the **az-migrate** VM
+4. Set a password for the Administrator account when prompted
+
+> **Tip:** After setting the appliance password, you can connect directly to it using `.\tunnel.ps1` (section 2.3)
 
 ---
 
@@ -84,7 +103,7 @@ This opens a Bastion tunnel on port **33389** to the DC VM.
 
 ## Part 4: Configure the Azure Migrate Appliance
 
-Access the appliance via the RDP session (localhost:33389).
+Connect to the appliance using `.\tunnel.ps1` and RDP to `localhost:33389` (see section 2.3).
 
 ### 4.1 Set up prerequisites
 
