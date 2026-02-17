@@ -384,34 +384,62 @@ if ($installed) {
     exit 0
 }
 
+# Ensure directory exists
+if (-not (Test-Path "C:\dc-files")) {
+    New-Item -ItemType Directory -Path "C:\dc-files" -Force | Out-Null
+}
+
 # Download
 if (-not (Test-Path $installerPath)) {
     Write-Host "Downloading ASR Provider..."
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $ProgressPreference = 'SilentlyContinue'
-    Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
-    Write-Host "Download complete: $installerPath"
+    try {
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
+        Write-Host "Download complete: $installerPath (Size: $((Get-Item $installerPath).Length) bytes)"
+    } catch {
+        Write-Host "ERROR: Download failed - $_"
+        exit 1
+    }
 } else {
     Write-Host "Installer already downloaded: $installerPath"
+}
+
+# Verify download
+if (-not (Test-Path $installerPath) -or (Get-Item $installerPath).Length -lt 1000000) {
+    Write-Host "ERROR: Downloaded file is missing or too small"
+    exit 1
 }
 
 # Extract
 if (-not (Test-Path $extractPath)) {
     New-Item -ItemType Directory -Path $extractPath -Force | Out-Null
 }
-Write-Host "Extracting installer..."
-& $installerPath /x:$extractPath /q
-Start-Sleep -Seconds 10
+Write-Host "Extracting installer to $extractPath..."
+$extractResult = Start-Process -FilePath $installerPath -ArgumentList "/x:$extractPath", "/q" -Wait -PassThru
+Write-Host "Extraction exit code: $($extractResult.ExitCode)"
+Start-Sleep -Seconds 15
 
-# Install silently
+# List extracted files for debugging
+Write-Host "Extracted files:"
+Get-ChildItem -Path $extractPath -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
+
+# Install silently - look for the provider setup
 $setupExe = Get-ChildItem -Path $extractPath -Filter "setupdr.exe" -Recurse | Select-Object -First 1
 if (-not $setupExe) {
-    Write-Host "ERROR: setupdr.exe not found in $extractPath"
+    # Try alternative installer names
+    $setupExe = Get-ChildItem -Path $extractPath -Filter "*.exe" -Recurse | Where-Object { $_.Name -like "*setup*" -or $_.Name -like "*install*" } | Select-Object -First 1
+}
+if (-not $setupExe) {
+    Write-Host "ERROR: Setup executable not found in $extractPath"
+    Write-Host "Available executables:"
+    Get-ChildItem -Path $extractPath -Filter "*.exe" -Recurse | ForEach-Object { Write-Host "  $($_.Name)" }
     exit 1
 }
 
-Write-Host "Installing ASR Provider silently..."
-& $setupExe.FullName /i /q
+Write-Host "Installing ASR Provider using: $($setupExe.FullName)"
+$installResult = Start-Process -FilePath $setupExe.FullName -ArgumentList "/i", "/q" -Wait -PassThru
+Write-Host "Installation exit code: $($installResult.ExitCode)"
 
 # Wait for installation to complete
 $maxWait = 300
@@ -422,40 +450,60 @@ while ($waited -lt $maxWait) {
     $check = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like '*Azure Site Recovery*' -or $_.Name -like '*Microsoft Azure Site Recovery*' }
     if ($check) {
         Write-Host "ASR Provider installed successfully: $($check.Name)"
-        break
+        exit 0
     }
     Write-Host "  Waiting for installation... ($waited s)"
 }
 
-if ($waited -ge $maxWait) {
-    Write-Host "WARNING: Installation may still be in progress"
-}
-
-Write-Host "ASR Provider installation step complete"
+Write-Host "WARNING: Installation may still be in progress or failed"
+exit 1
 '@
 
 $tempFile = [System.IO.Path]::GetTempFileName() + ".ps1"
 try {
     $installDraScript | Out-File -FilePath $tempFile -Encoding ASCII
 
+    Write-Host "Running ASR installation on remote VM (this may take several minutes)..." -ForegroundColor Gray
+    
     $output = & az vm run-command invoke `
         --resource-group $ResourceGroupName `
         --name $VMName `
         --command-id RunPowerShellScript `
         --scripts "@$tempFile" `
-        --timeout 600 `
-        --output json 2>$null
+        --output json 2>&1
 
     Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
 
-    $result = ($output | ConvertFrom-Json).value
-    $stdOut = ($result | Where-Object { $_.code -like '*StdOut*' }).message
-    $stdErr = ($result | Where-Object { $_.code -like '*StdErr*' }).message
+    if (-not $output) {
+        Write-Host "WARNING: No output received from remote command" -ForegroundColor Yellow
+        Write-Host "You can install manually by downloading from https://aka.ms/downloaddra" -ForegroundColor Yellow
+    } else {
+        try {
+            $result = ($output | ConvertFrom-Json).value
+            $stdOut = ($result | Where-Object { $_.code -like '*StdOut*' }).message
+            $stdErr = ($result | Where-Object { $_.code -like '*StdErr*' }).message
 
-    if ($stdOut) { Write-Host $stdOut -ForegroundColor Gray }
-    if ($stdErr -and $stdErr.Trim()) { Write-Host "Warnings: $stdErr" -ForegroundColor Yellow }
+            if ($stdOut) { 
+                Write-Host "Remote output:" -ForegroundColor Gray
+                Write-Host $stdOut -ForegroundColor Gray 
+            }
+            if ($stdErr -and $stdErr.Trim()) { Write-Host "Stderr: $stdErr" -ForegroundColor Yellow }
 
-    Write-Host "ASR Provider installation complete!" -ForegroundColor Green
+            # Check if installation actually succeeded by looking for success message or error
+            if ($stdOut -match "installed successfully" -or $stdOut -match "already installed") {
+                Write-Host "ASR Provider installation complete!" -ForegroundColor Green
+            } elseif ($stdOut -match "ERROR:" -or $stdOut -match "not found") {
+                Write-Host "WARNING: ASR Provider installation failed - check output above" -ForegroundColor Yellow
+                Write-Host "You can install manually by downloading from https://aka.ms/downloaddra" -ForegroundColor Yellow
+            } else {
+                Write-Host "WARNING: ASR Provider installation status unclear - verify manually" -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host "Raw output from az command:" -ForegroundColor Yellow
+            Write-Host $output -ForegroundColor Gray
+            Write-Host "WARNING: Could not parse command output" -ForegroundColor Yellow
+        }
+    }
 } catch {
     Write-Host "WARNING: ASR Provider installation failed: $_" -ForegroundColor Yellow
     Write-Host "You can install manually by downloading from https://aka.ms/downloaddra" -ForegroundColor Yellow
@@ -475,4 +523,6 @@ Write-Host "1. Run 03-deploy-azure-migrate.ps1 to deploy Azure Migrate" -Foregro
 Write-Host "2. Run 04-deploy-webapp.ps1 to deploy the Webapp VM" -ForegroundColor Cyan
 Write-Host "3. Run 05-deploy-ubuntu.ps1 to deploy the Ubuntu VM" -ForegroundColor Cyan
 Write-Host ""
+
+exit 0
 
