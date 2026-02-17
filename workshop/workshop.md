@@ -177,8 +177,17 @@ Click **Add more**, then add:
 |---------|----------|----------|
 | DC VM (azureuser) | `azureuser` | `$uper$ecretP@ssw0rd` |
 | Ubuntu VM SSH | `ubuntu` | `ubuntu` |
-| Webapp (http://\<vm-ip\>:3000) | — | — |
+| Webapp (http://\<webapp-vm-ip\>:3000) | — | — |
 | PostgreSQL | `webadmin` | `webadmin123` |
+
+## Reference: VM IP Addresses
+
+| VM | IP Address | Access |
+|----|------------|--------|
+| az-migrate | 192.168.100.10 (reserved) | RDP via `.\tunnel.ps1` → localhost:33389 |
+| webapp-vm | DHCP (192.168.100.x) | SSH or HTTP:3000 from DC VM |
+| ubuntu-vm | DHCP (192.168.100.x) | SSH from DC VM |
+| DC VM (gateway) | 192.168.100.1 | Hyper-V host for nested VMs |
 
 
 

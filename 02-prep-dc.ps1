@@ -308,9 +308,9 @@ $configurePortForwardingScript = @'
 $ErrorActionPreference = 'Stop'
 
 # Port forwarding for az-migrate appliance (RDP)
-# az-migrate typically gets 192.168.100.11 (second VM after ubuntu gets .10)
+# az-migrate gets 192.168.100.10 (first VM to request DHCP lease)
 $ExternalPort = 33389
-$InternalIP = "192.168.100.11"
+$InternalIP = "192.168.100.10"
 $InternalPort = 3389
 
 # Remove existing rule if present (suppress errors)

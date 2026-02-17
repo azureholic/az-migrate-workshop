@@ -7,7 +7,8 @@ param(
     [string]$ExtractPath = "C:\VMs",
     [int64]$MemoryStartupBytes = 8GB,
     [int]$ProcessorCount = 2,
-    [string]$SwitchName = "NAT-Switch"
+    [string]$SwitchName = "NAT-Switch",
+    [string]$StaticIP = "192.168.100.10"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -292,6 +293,25 @@ try {
 # ============================================
 Write-Host "`n=== VM Import Complete ===" -ForegroundColor Yellow
 
+# Add DHCP reservation for static IP
+Write-Host "`nConfiguring DHCP reservation for static IP..." -ForegroundColor Cyan
+try {
+    $vmNetAdapter = Get-VMNetworkAdapter -VMName $VMName
+    $macAddress = $vmNetAdapter.MacAddress -replace '(..)(..)(..)(..)(..)(..)','$1-$2-$3-$4-$5-$6'
+    
+    # Remove existing reservation if present
+    Get-DhcpServerv4Reservation -ScopeId 192.168.100.0 -ErrorAction SilentlyContinue | 
+        Where-Object { $_.IPAddress -eq $StaticIP -or $_.ClientId -eq $macAddress } |
+        Remove-DhcpServerv4Reservation -ErrorAction SilentlyContinue
+    
+    # Add new reservation
+    Add-DhcpServerv4Reservation -ScopeId 192.168.100.0 -IPAddress $StaticIP -ClientId $macAddress -Name $VMName -Description "Azure Migrate Appliance"
+    Write-Host "DHCP reservation added: $VMName -> $StaticIP (MAC: $macAddress)" -ForegroundColor Green
+} catch {
+    Write-Host "WARNING: Could not add DHCP reservation: $_" -ForegroundColor Yellow
+    Write-Host "VM will use dynamic IP from DHCP" -ForegroundColor Yellow
+}
+
 $vm = Get-VM -Name $VMName
 $vmLocation = $vm.ConfigurationLocation
 
@@ -302,6 +322,7 @@ Write-Host "  CPUs: $($vm.ProcessorCount)" -ForegroundColor Gray
 Write-Host "  Memory: $([math]::Round($vm.MemoryStartup/1GB))GB" -ForegroundColor Gray
 Write-Host "  Location: $vmLocation" -ForegroundColor Gray
 Write-Host "  Switch: $SwitchName" -ForegroundColor Gray
+Write-Host "  Static IP: $StaticIP (via DHCP reservation)" -ForegroundColor Gray
 
 Write-Host "`nNext Steps:" -ForegroundColor Yellow
 Write-Host "1. Connect to the VM via Hyper-V Manager" -ForegroundColor Cyan
