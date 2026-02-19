@@ -4,19 +4,40 @@
 
 param(
     [string]$ResourceGroupName = "rg-migrate-workshop",
-    [string]$VMName = "vm-dc"
+    [string]$VMName = "vm-dc",
+    [string]$MigrateResourceGroupName = "rg-migrate-workshop",
+    [string]$VaultName = "rsv-migrate"
 )
 
 $ErrorActionPreference = "Stop"
 
 Write-Host "`n=== Azure Migration Workshop - Prepare DC VM ===" -ForegroundColor Yellow
 Write-Host "Resource Group: $ResourceGroupName" -ForegroundColor Cyan
-Write-Host "VM Name: $VMName`n" -ForegroundColor Cyan
+Write-Host "VM Name: $VMName" -ForegroundColor Cyan
+Write-Host "Migrate RG: $MigrateResourceGroupName" -ForegroundColor Cyan
+Write-Host "Vault Name: $VaultName`n" -ForegroundColor Cyan
+
+# ============================================
+# 0. Check and install required PowerShell modules
+# ============================================
+Write-Host "[0/4] Checking required PowerShell modules..." -ForegroundColor Yellow
+
+$requiredModules = @("Az.Accounts")
+foreach ($moduleName in $requiredModules) {
+    $module = Get-Module -ListAvailable -Name $moduleName | Select-Object -First 1
+    if (-not $module) {
+        Write-Host "Installing $moduleName module..." -ForegroundColor Gray
+        Install-Module -Name $moduleName -Scope CurrentUser -Force -AllowClobber -Repository PSGallery
+        Write-Host "$moduleName installed" -ForegroundColor Green
+    } else {
+        Write-Host "$moduleName already installed (v$($module.Version))" -ForegroundColor Green
+    }
+}
 
 # ============================================
 # 1. Check if Hyper-V is already enabled
 # ============================================
-Write-Host "[1/5] Checking if Hyper-V is already installed..." -ForegroundColor Yellow
+Write-Host "[1/4] Checking if Hyper-V is already installed..." -ForegroundColor Yellow
 
 $hypervCheckOutput = az vm run-command invoke `
     --resource-group $ResourceGroupName `
@@ -36,7 +57,7 @@ if ($hypervInstalled) {
 # ============================================
 # 2. Enable Hyper-V (will cause reboot)
 # ============================================
-Write-Host "`n[1/5] Enabling Hyper-V on VM..." -ForegroundColor Yellow
+Write-Host "`n[1/4] Enabling Hyper-V on VM..." -ForegroundColor Yellow
 Write-Host "Note: This will cause the VM to reboot`n" -ForegroundColor Cyan
 
 $enableHyperVScript = @'
@@ -126,7 +147,7 @@ try {
 # ============================================
 # 3. Create NAT Virtual Switch
 # ============================================
-Write-Host "`n[2/5] Creating NAT virtual switch..." -ForegroundColor Yellow
+Write-Host "`n[2/4] Creating NAT virtual switch..." -ForegroundColor Yellow
 Write-Host "Note: NAT networking is required for nested VMs in Azure`n" -ForegroundColor Cyan
 
 $createNatSwitchScript = @'
@@ -207,7 +228,7 @@ try {
 # ============================================
 # 4. Configure DHCP Server
 # ============================================
-Write-Host "`n[3/5] Configuring DHCP server..." -ForegroundColor Yellow
+Write-Host "`n[3/4] Configuring DHCP server..." -ForegroundColor Yellow
 Write-Host "Note: DHCP provides automatic IP addresses to nested VMs`n" -ForegroundColor Cyan
 
 $configureDhcpScript = @'
@@ -301,7 +322,7 @@ try {
 # ============================================
 # 5. Configure Port Forwarding for Bastion Tunneling
 # ============================================
-Write-Host "`n[4/5] Configuring port forwarding for az-migrate appliance..." -ForegroundColor Yellow
+Write-Host "`n[4/4] Configuring port forwarding for az-migrate appliance..." -ForegroundColor Yellow
 Write-Host "Note: Enables RDP access via Bastion tunnel`n" -ForegroundColor Cyan
 
 $configurePortForwardingScript = @'
@@ -365,151 +386,6 @@ try {
 }
 
 # ============================================
-# 6. Download and install ASR Provider (DRA) on DC VM
-# ============================================
-Write-Host "`n[5/5] Installing Azure Site Recovery Provider..." -ForegroundColor Yellow
-Write-Host "Downloading from https://aka.ms/downloaddra`n" -ForegroundColor Gray
-
-$installDraScript = @'
-$ErrorActionPreference = 'Stop'
-
-$downloadUrl = "https://aka.ms/downloaddra"
-$installerPath = "C:\dc-files\AzureSiteRecoveryProvider.exe"
-$extractPath = "C:\dc-files\ASRProvider"
-
-# Check if already installed
-$installed = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like '*Azure Site Recovery*' -or $_.Name -like '*Microsoft Azure Site Recovery*' }
-if ($installed) {
-    Write-Host "Azure Site Recovery Provider is already installed: $($installed.Name)"
-    exit 0
-}
-
-# Ensure directory exists
-if (-not (Test-Path "C:\dc-files")) {
-    New-Item -ItemType Directory -Path "C:\dc-files" -Force | Out-Null
-}
-
-# Download
-if (-not (Test-Path $installerPath)) {
-    Write-Host "Downloading ASR Provider..."
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    $ProgressPreference = 'SilentlyContinue'
-    try {
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
-        Write-Host "Download complete: $installerPath (Size: $((Get-Item $installerPath).Length) bytes)"
-    } catch {
-        Write-Host "ERROR: Download failed - $_"
-        exit 1
-    }
-} else {
-    Write-Host "Installer already downloaded: $installerPath"
-}
-
-# Verify download
-if (-not (Test-Path $installerPath) -or (Get-Item $installerPath).Length -lt 1000000) {
-    Write-Host "ERROR: Downloaded file is missing or too small"
-    exit 1
-}
-
-# Extract
-if (-not (Test-Path $extractPath)) {
-    New-Item -ItemType Directory -Path $extractPath -Force | Out-Null
-}
-Write-Host "Extracting installer to $extractPath..."
-$extractResult = Start-Process -FilePath $installerPath -ArgumentList "/x:$extractPath", "/q" -Wait -PassThru
-Write-Host "Extraction exit code: $($extractResult.ExitCode)"
-Start-Sleep -Seconds 15
-
-# List extracted files for debugging
-Write-Host "Extracted files:"
-Get-ChildItem -Path $extractPath -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
-
-# Install silently - look for the provider setup
-$setupExe = Get-ChildItem -Path $extractPath -Filter "setupdr.exe" -Recurse | Select-Object -First 1
-if (-not $setupExe) {
-    # Try alternative installer names
-    $setupExe = Get-ChildItem -Path $extractPath -Filter "*.exe" -Recurse | Where-Object { $_.Name -like "*setup*" -or $_.Name -like "*install*" } | Select-Object -First 1
-}
-if (-not $setupExe) {
-    Write-Host "ERROR: Setup executable not found in $extractPath"
-    Write-Host "Available executables:"
-    Get-ChildItem -Path $extractPath -Filter "*.exe" -Recurse | ForEach-Object { Write-Host "  $($_.Name)" }
-    exit 1
-}
-
-Write-Host "Installing ASR Provider using: $($setupExe.FullName)"
-$installResult = Start-Process -FilePath $setupExe.FullName -ArgumentList "/i", "/q" -Wait -PassThru
-Write-Host "Installation exit code: $($installResult.ExitCode)"
-
-# Wait for installation to complete
-$maxWait = 300
-$waited = 0
-while ($waited -lt $maxWait) {
-    Start-Sleep -Seconds 10
-    $waited += 10
-    $check = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like '*Azure Site Recovery*' -or $_.Name -like '*Microsoft Azure Site Recovery*' }
-    if ($check) {
-        Write-Host "ASR Provider installed successfully: $($check.Name)"
-        exit 0
-    }
-    Write-Host "  Waiting for installation... ($waited s)"
-}
-
-Write-Host "WARNING: Installation may still be in progress or failed"
-exit 1
-'@
-
-$tempFile = [System.IO.Path]::GetTempFileName() + ".ps1"
-try {
-    $installDraScript | Out-File -FilePath $tempFile -Encoding ASCII
-
-    Write-Host "Running ASR installation on remote VM (this may take several minutes)..." -ForegroundColor Gray
-    
-    $output = & az vm run-command invoke `
-        --resource-group $ResourceGroupName `
-        --name $VMName `
-        --command-id RunPowerShellScript `
-        --scripts "@$tempFile" `
-        --output json 2>&1
-
-    Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-
-    if (-not $output) {
-        Write-Host "WARNING: No output received from remote command" -ForegroundColor Yellow
-        Write-Host "You can install manually by downloading from https://aka.ms/downloaddra" -ForegroundColor Yellow
-    } else {
-        try {
-            $result = ($output | ConvertFrom-Json).value
-            $stdOut = ($result | Where-Object { $_.code -like '*StdOut*' }).message
-            $stdErr = ($result | Where-Object { $_.code -like '*StdErr*' }).message
-
-            if ($stdOut) { 
-                Write-Host "Remote output:" -ForegroundColor Gray
-                Write-Host $stdOut -ForegroundColor Gray 
-            }
-            if ($stdErr -and $stdErr.Trim()) { Write-Host "Stderr: $stdErr" -ForegroundColor Yellow }
-
-            # Check if installation actually succeeded by looking for success message or error
-            if ($stdOut -match "installed successfully" -or $stdOut -match "already installed") {
-                Write-Host "ASR Provider installation complete!" -ForegroundColor Green
-            } elseif ($stdOut -match "ERROR:" -or $stdOut -match "not found") {
-                Write-Host "WARNING: ASR Provider installation failed - check output above" -ForegroundColor Yellow
-                Write-Host "You can install manually by downloading from https://aka.ms/downloaddra" -ForegroundColor Yellow
-            } else {
-                Write-Host "WARNING: ASR Provider installation status unclear - verify manually" -ForegroundColor Yellow
-            }
-        } catch {
-            Write-Host "Raw output from az command:" -ForegroundColor Yellow
-            Write-Host $output -ForegroundColor Gray
-            Write-Host "WARNING: Could not parse command output" -ForegroundColor Yellow
-        }
-    }
-} catch {
-    Write-Host "WARNING: ASR Provider installation failed: $_" -ForegroundColor Yellow
-    Write-Host "You can install manually by downloading from https://aka.ms/downloaddra" -ForegroundColor Yellow
-}
-
-# ============================================
 # Summary
 # ============================================
 Write-Host "`n=== Preparation Complete ===" -ForegroundColor Yellow
@@ -517,11 +393,11 @@ Write-Host "Hyper-V is now enabled on the DC VM" -ForegroundColor Cyan
 Write-Host "NAT switch configured for nested VM internet access" -ForegroundColor Cyan
 Write-Host "DHCP server configured for automatic IP assignment" -ForegroundColor Cyan
 Write-Host "Port forwarding configured for az-migrate RDP (port 33389)" -ForegroundColor Cyan
-Write-Host "Azure Site Recovery Provider installed" -ForegroundColor Cyan
 Write-Host "`nNext Steps:" -ForegroundColor Yellow
-Write-Host "1. Run 03-deploy-azure-migrate.ps1 to deploy Azure Migrate" -ForegroundColor Cyan
+Write-Host "1. Run 03-deploy-azure-migrate.ps1 to deploy Azure Migrate appliance" -ForegroundColor Cyan
 Write-Host "2. Run 04-deploy-webapp.ps1 to deploy the Webapp VM" -ForegroundColor Cyan
 Write-Host "3. Run 05-deploy-ubuntu.ps1 to deploy the Ubuntu VM" -ForegroundColor Cyan
+Write-Host "4. Use Azure Migrate portal to discover and register Hyper-V hosts" -ForegroundColor Cyan
 Write-Host ""
 
 exit 0

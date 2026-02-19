@@ -47,6 +47,36 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2024-05-01' = {
   }
 }
 
+// Public IP for NAT Gateway
+resource natGatewayPublicIp 'Microsoft.Network/publicIPAddresses@2024-05-01' = {
+  name: 'pip-natgw-dc'
+  location: location
+  sku: {
+    name: 'Standard'
+  }
+  properties: {
+    publicIPAllocationMethod: 'Static'
+    publicIPAddressVersion: 'IPv4'
+  }
+}
+
+// NAT Gateway for outbound traffic
+resource natGateway 'Microsoft.Network/natGateways@2024-05-01' = {
+  name: 'natgw-dc'
+  location: location
+  sku: {
+    name: 'Standard'
+  }
+  properties: {
+    idleTimeoutInMinutes: 10
+    publicIpAddresses: [
+      {
+        id: natGatewayPublicIp.id
+      }
+    ]
+  }
+}
+
 // VNet with 2 subnets
 module vnet 'br/public:avm/res/network/virtual-network:0.7.1' = {
   name: 'vnet-dc-deployment'
@@ -61,6 +91,7 @@ module vnet 'br/public:avm/res/network/virtual-network:0.7.1' = {
         name: 'default'
         addressPrefix: '10.0.0.0/24'
         networkSecurityGroupResourceId: nsg.id
+        natGatewayResourceId: natGateway.id
       }
       {
         name: 'AzureBastionSubnet'
@@ -172,3 +203,5 @@ output vmId string = vm.outputs.resourceId
 output bastionId string = bastion.outputs.resourceId
 output storageAccountName string = storageAccount.outputs.name
 output vmName string = vm.outputs.name
+output natGatewayId string = natGateway.id
+output natGatewayPublicIp string = natGatewayPublicIp.properties.ipAddress

@@ -4,9 +4,6 @@ param location string = resourceGroup().location
 @description('Name of the Azure Migrate project')
 param migrateProjectName string = 'migrate-project'
 
-@description('Name of the Recovery Services Vault for replication')
-param recoveryVaultName string = 'rsv-migrate'
-
 @description('Name of the Storage Account for replication data')
 param replicationStorageAccountName string = 'stmigrate${uniqueString(resourceGroup().id)}'
 
@@ -67,29 +64,18 @@ resource replicationStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01
   }
 }
 
-// Recovery Services Vault for Azure Migrate
-resource recoveryVault 'Microsoft.RecoveryServices/vaults@2024-04-01' = {
-  name: recoveryVaultName
-  location: location
-  sku: {
-    name: 'RS0'
-    tier: 'Standard'
-  }
-  properties: {
-    publicNetworkAccess: 'Enabled'
-  }
-}
-
 // Azure Migrate Project with System Assigned Identity
 resource migrateProject 'Microsoft.Migrate/migrateProjects@2020-05-01' = {
   name: migrateProjectName
   location: location
+  #disable-next-line BCP187
   identity: {
     type: 'SystemAssigned'
   }
   properties: {
     publicNetworkAccess: 'Enabled'
   }
+  #disable-next-line BCP187
   tags: {
     Environment: 'Migration'
     Purpose: 'Azure Migrate Workshop'
@@ -103,6 +89,7 @@ resource migrateStorageRoleAssignment 'Microsoft.Authorization/roleAssignments@2
   scope: replicationStorageAccount
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+    #disable-next-line BCP187
     principalId: migrateProject.identity.principalId
     principalType: 'ServicePrincipal'
   }
@@ -118,8 +105,6 @@ resource migrateStorageRoleAssignment 'Microsoft.Authorization/roleAssignments@2
 // Outputs
 output migrateProjectId string = migrateProject.id
 output migrateProjectName string = migrateProject.name
-output recoveryVaultId string = recoveryVault.id
-output recoveryVaultName string = recoveryVault.name
 output replicationStorageAccountId string = replicationStorageAccount.id
 output replicationStorageAccountName string = replicationStorageAccount.name
 output targetVnetId string = vnet.id
