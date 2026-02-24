@@ -8,9 +8,6 @@ param adminUsername string
 @secure()
 param adminPassword string
 
-@description('Current user object ID for blob access')
-param currentUserObjectId string = ''
-
 // NSG for default subnet - allows Bastion tunnel traffic
 resource nsg 'Microsoft.Network/networkSecurityGroups@2024-05-01' = {
   name: 'nsg-dc-default'
@@ -101,50 +98,6 @@ module vnet 'br/public:avm/res/network/virtual-network:0.7.1' = {
   }
 }
 
-// Storage Account for scripts
-module storageAccount 'br/public:avm/res/storage/storage-account:0.15.0' = {
-  name: 'storage-scripts-deployment'
-  params: {
-    name: 'stscripts${uniqueString(resourceGroup().id)}'
-    location: location
-    kind: 'StorageV2'
-    skuName: 'Standard_LRS'
-    allowSharedKeyAccess: false
-    allowBlobPublicAccess: true
-    publicNetworkAccess: 'Enabled'
-    networkAcls: {
-      defaultAction: 'Allow'
-      bypass: 'AzureServices'
-    }
-    blobServices: {
-      containers: [
-        {
-          name: 'scripts'
-          publicAccess: 'None'
-        }
-      ]
-    }
-    roleAssignments: !empty(currentUserObjectId) ? [
-      {
-        principalId: currentUserObjectId
-        roleDefinitionIdOrName: 'Storage Blob Data Contributor'
-        principalType: 'User'
-      }
-      {
-        principalId: vm.outputs.systemAssignedMIPrincipalId
-        roleDefinitionIdOrName: 'Storage Blob Data Reader'
-        principalType: 'ServicePrincipal'
-      }
-    ] : [
-      {
-        principalId: vm.outputs.systemAssignedMIPrincipalId
-        roleDefinitionIdOrName: 'Storage Blob Data Reader'
-        principalType: 'ServicePrincipal'
-      }
-    ]
-  }
-}
-
 // VM with Windows Server
 module vm 'br/public:avm/res/compute/virtual-machine:0.11.0' = {
   name: 'vm-dc-deployment'
@@ -201,7 +154,6 @@ module bastion 'br/public:avm/res/network/bastion-host:0.7.0' = {
 output vnetId string = vnet.outputs.resourceId
 output vmId string = vm.outputs.resourceId
 output bastionId string = bastion.outputs.resourceId
-output storageAccountName string = storageAccount.outputs.name
 output vmName string = vm.outputs.name
 output natGatewayId string = natGateway.id
 output natGatewayPublicIp string = natGatewayPublicIp.properties.ipAddress

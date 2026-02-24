@@ -19,6 +19,7 @@ Write-Host "  2. Prepare DC VM (Hyper-V, NAT, DHCP)" -ForegroundColor Gray
 Write-Host "  3. Deploy Azure Migrate infrastructure" -ForegroundColor Gray
 Write-Host "  4. Deploy Ubuntu Webapp VM in Hyper-V" -ForegroundColor Gray
 Write-Host "  5. Deploy Ubuntu VM in Hyper-V" -ForegroundColor Gray
+Write-Host "  6. Deploy Windows Server 2019 ADDS VM in Hyper-V" -ForegroundColor Gray
 Write-Host "`nResource Group: $ResourceGroupName" -ForegroundColor Cyan
 Write-Host "Location: $Location`n" -ForegroundColor Cyan
 
@@ -29,7 +30,7 @@ $stepTimings = @{}
 # ============================================
 # Step 1: Deploy DC Infrastructure
 # ============================================
-Write-Host "`n[1/5] Deploying DC VM Infrastructure..." -ForegroundColor Yellow
+Write-Host "`n[1/6] Deploying DC VM Infrastructure..." -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
 $stepStart = Get-Date
@@ -52,7 +53,7 @@ Write-Host "DC VM infrastructure deployed successfully! ($(($stepTimings["DC Dep
 # ============================================
 # Step 2: Prepare DC VM
 # ============================================
-Write-Host "`n[2/5] Preparing DC VM (Hyper-V, NAT, DHCP)..." -ForegroundColor Yellow
+Write-Host "`n[2/6] Preparing DC VM (Hyper-V, NAT, DHCP)..." -ForegroundColor Yellow
 Write-Host "=============================================" -ForegroundColor Yellow
 
 $stepStart = Get-Date
@@ -75,7 +76,7 @@ Write-Host "DC VM prepared successfully! ($(($stepTimings["DC Prep"]).ToString('
 # ============================================
 # Step 3: Deploy Azure Migrate
 # ============================================
-Write-Host "`n[3/5] Deploying Azure Migrate Infrastructure..." -ForegroundColor Yellow
+Write-Host "`n[3/6] Deploying Azure Migrate Infrastructure..." -ForegroundColor Yellow
 Write-Host "===============================================" -ForegroundColor Yellow
 
 $stepStart = Get-Date
@@ -98,7 +99,7 @@ Write-Host "Azure Migrate infrastructure deployed successfully! ($(($stepTimings
 # ============================================
 # Step 4: Deploy Ubuntu Webapp VM
 # ============================================
-Write-Host "`n[4/5] Deploying Ubuntu Webapp VM in Hyper-V..." -ForegroundColor Yellow
+Write-Host "`n[4/6] Deploying Ubuntu Webapp VM in Hyper-V..." -ForegroundColor Yellow
 Write-Host "================================================" -ForegroundColor Yellow
 
 $stepStart = Get-Date
@@ -121,7 +122,7 @@ Write-Host "Webapp VM deployed successfully! ($(($stepTimings["Webapp VM"]).ToSt
 # ============================================
 # Step 5: Deploy Ubuntu VM
 # ============================================
-Write-Host "`n[5/5] Deploying Ubuntu VM in Hyper-V..." -ForegroundColor Yellow
+Write-Host "`n[5/6] Deploying Ubuntu VM in Hyper-V..." -ForegroundColor Yellow
 Write-Host "=======================================" -ForegroundColor Yellow
 
 $stepStart = Get-Date
@@ -140,6 +141,29 @@ if ($LASTEXITCODE -ne 0) {
 
 $stepTimings["Ubuntu"] = (Get-Date) - $stepStart
 Write-Host "Ubuntu VM deployed successfully! ($(($stepTimings["Ubuntu"]).ToString('mm\:ss')))" -ForegroundColor Green
+
+# ============================================
+# Step 6: Deploy Windows Server 2019 ADDS VM
+# ============================================
+Write-Host "`n[6/6] Deploying Windows Server 2019 ADDS VM in Hyper-V..." -ForegroundColor Yellow
+Write-Host "=========================================================" -ForegroundColor Yellow
+
+$stepStart = Get-Date
+$addsScript = Join-Path $scriptDir "06-deploy-adds.ps1"
+if (-not (Test-Path $addsScript)) {
+    Write-Host "ERROR: Script not found: $addsScript" -ForegroundColor Red
+    exit 1
+}
+
+& $addsScript -ResourceGroupName $ResourceGroupName
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: ADDS VM deployment failed" -ForegroundColor Red
+    exit 1
+}
+
+$stepTimings["ADDS VM"] = (Get-Date) - $stepStart
+Write-Host "ADDS VM deployed successfully! ($(($stepTimings["ADDS VM"]).ToString('mm\:ss')))" -ForegroundColor Green
 
 # ============================================
 # Summary
@@ -164,6 +188,7 @@ Write-Host "  - Hyper-V, NAT networking, DHCP server on DC VM" -ForegroundColor 
 Write-Host "  - Azure Migrate project with all solutions" -ForegroundColor Gray
 Write-Host "  - Ubuntu Webapp VM running in Hyper-V" -ForegroundColor Gray
 Write-Host "  - Ubuntu 24.04 VM running in Hyper-V" -ForegroundColor Gray
+Write-Host "  - Windows Server 2019 ADDS VM (Domain Controller) in Hyper-V" -ForegroundColor Gray
 
 Write-Host "`nNext Steps:" -ForegroundColor Yellow
 Write-Host "1. Connect to the DC VM via RDP or Bastion" -ForegroundColor Cyan
