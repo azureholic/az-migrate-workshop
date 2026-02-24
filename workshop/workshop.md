@@ -176,6 +176,7 @@ Click **Add more**, then add:
 | Service | Username | Password |
 |---------|----------|----------|
 | DC VM (azureuser) | `azureuser` | `$uper$ecretP@ssw0rd` |
+| Windows Hyper-V VM (ADDS) | `MIGRATE\Administrator` or `Administrator@migrate.local` | `Windows123!` |
 | Ubuntu VM SSH | `ubuntu` | `ubuntu` |
 | Webapp (http://\<webapp-vm-ip\>:3000) | — | — |
 | PostgreSQL | `webadmin` | `webadmin123` |
@@ -185,6 +186,7 @@ Click **Add more**, then add:
 | VM | IP Address | Access |
 |----|------------|--------|
 | az-migrate | 192.168.100.10 (reserved) | RDP via `.\tunnel.ps1` → localhost:33389 |
+| adds-vm | 192.168.100.20 (reserved) | RDP from DC VM (Domain Controller) |
 | webapp-vm | DHCP (192.168.100.x) | SSH or HTTP:3000 from DC VM |
 | ubuntu-vm | DHCP (192.168.100.x) | SSH from DC VM |
 | DC VM (gateway) | 192.168.100.1 | Hyper-V host for nested VMs |

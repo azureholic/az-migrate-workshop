@@ -17,7 +17,7 @@ Write-Host "Location: $Location`n" -ForegroundColor Cyan
 # ============================================
 # 1. Verify Azure CLI is installed and logged in
 # ============================================
-Write-Host "[1/4] Checking Azure CLI..." -ForegroundColor Yellow
+Write-Host "[1/3] Checking Azure CLI..." -ForegroundColor Yellow
 
 try {
     $azVersion = az version --output json 2>&1 | ConvertFrom-Json
@@ -42,7 +42,7 @@ try {
 # ============================================
 # 2. Create Resource Group
 # ============================================
-Write-Host "`n[2/4] Creating Resource Group..." -ForegroundColor Yellow
+Write-Host "`n[2/3] Creating Resource Group..." -ForegroundColor Yellow
 
 $rgExists = az group exists --name $ResourceGroupName 2>&1
 if ($rgExists -eq "true") {
@@ -58,27 +58,9 @@ if ($rgExists -eq "true") {
 }
 
 # ============================================
-# 3. Get Current User Object ID
+# 3. Deploy Bicep Template
 # ============================================
-Write-Host "`n[3/4] Getting current user object ID..." -ForegroundColor Yellow
-
-try {
-    $currentUser = az ad signed-in-user show --query id --output tsv 2>&1
-    if ($LASTEXITCODE -eq 0 -and $currentUser) {
-        Write-Host "Current user object ID: $currentUser" -ForegroundColor Green
-    } else {
-        Write-Host "Warning: Could not get user object ID (deployment will continue without user RBAC)" -ForegroundColor Yellow
-        $currentUser = ""
-    }
-} catch {
-    Write-Host "Warning: Could not get user object ID (deployment will continue without user RBAC)" -ForegroundColor Yellow
-    $currentUser = ""
-}
-
-# ============================================
-# 4. Deploy Bicep Template
-# ============================================
-Write-Host "`n[4/4] Deploying DC Infrastructure..." -ForegroundColor Yellow
+Write-Host "`n[3/3] Deploying DC Infrastructure..." -ForegroundColor Yellow
 
 # Verify template files exist
 if (-not (Test-Path $TemplateFile)) {
@@ -104,7 +86,6 @@ $deployCmd = "az deployment group create " +
     "--name `"$deploymentName`" " +
     "--template-file `"$TemplateFile`" " +
     "--parameters `"$ParametersFile`" " +
-    "--parameters currentUserObjectId=`"$currentUser`" " +
     "--output json"
 
 Write-Host "Deployment name: $deploymentName" -ForegroundColor Gray
@@ -131,9 +112,6 @@ try {
         if ($deployment.properties.outputs.vmName) {
             Write-Host "  VM Name: $($deployment.properties.outputs.vmName.value)" -ForegroundColor Cyan
         }
-        if ($deployment.properties.outputs.storageAccountName) {
-            Write-Host "  Storage Account: $($deployment.properties.outputs.storageAccountName.value)" -ForegroundColor Cyan
-        }
         if ($deployment.properties.outputs.vnetId) {
             Write-Host "  VNet ID: $($deployment.properties.outputs.vnetId.value)" -ForegroundColor Gray
         }
@@ -150,6 +128,5 @@ try {
 # ============================================
 Write-Host "`n=== Next Steps ===" -ForegroundColor Yellow
 Write-Host "1. Connect to the VM via Azure Bastion in the Azure Portal" -ForegroundColor Cyan
-Write-Host "2. Upload scripts to the storage account container 'scripts'" -ForegroundColor Cyan
-Write-Host "3. Run the VM setup scripts to configure Hyper-V and nested VMs" -ForegroundColor Cyan
+Write-Host "2. Run the VM setup scripts to configure Hyper-V and nested VMs" -ForegroundColor Cyan
 Write-Host ""
