@@ -2,7 +2,7 @@
 # This script runs all orchestrators in sequence to set up the complete workshop environment
 
 param(
-    [string]$ResourceGroupName = "rg-migrate-workshop",
+    [string]$ResourceGroupName = "rg-migrate-workshop-1",
     [string]$Location = "swedencentral"
 )
 
