@@ -18,26 +18,9 @@ Write-Host "Migrate RG: $MigrateResourceGroupName" -ForegroundColor Cyan
 Write-Host "Vault Name: $VaultName`n" -ForegroundColor Cyan
 
 # ============================================
-# 0. Check and install required PowerShell modules
-# ============================================
-Write-Host "[0/4] Checking required PowerShell modules..." -ForegroundColor Yellow
-
-$requiredModules = @("Az.Accounts")
-foreach ($moduleName in $requiredModules) {
-    $module = Get-Module -ListAvailable -Name $moduleName | Select-Object -First 1
-    if (-not $module) {
-        Write-Host "Installing $moduleName module..." -ForegroundColor Gray
-        Install-Module -Name $moduleName -Scope CurrentUser -Force -AllowClobber -Repository PSGallery
-        Write-Host "$moduleName installed" -ForegroundColor Green
-    } else {
-        Write-Host "$moduleName already installed (v$($module.Version))" -ForegroundColor Green
-    }
-}
-
-# ============================================
 # 1. Check if Hyper-V is already enabled
 # ============================================
-Write-Host "[1/4] Checking if Hyper-V is already installed..." -ForegroundColor Yellow
+Write-Host "[1/7] Checking if Hyper-V is already installed..." -ForegroundColor Yellow
 
 $hypervCheckOutput = az vm run-command invoke `
     --resource-group $ResourceGroupName `
@@ -57,7 +40,7 @@ if ($hypervInstalled) {
 # ============================================
 # 2. Enable Hyper-V (will cause reboot)
 # ============================================
-Write-Host "`n[1/4] Enabling Hyper-V on VM..." -ForegroundColor Yellow
+Write-Host "`n[1/7] Enabling Hyper-V on VM..." -ForegroundColor Yellow
 Write-Host "Note: This will cause the VM to reboot`n" -ForegroundColor Cyan
 
 $enableHyperVScript = @'
@@ -147,7 +130,7 @@ try {
 # ============================================
 # 3. Create NAT Virtual Switch
 # ============================================
-Write-Host "`n[2/4] Creating NAT virtual switch..." -ForegroundColor Yellow
+Write-Host "`n[2/7] Creating NAT virtual switch..." -ForegroundColor Yellow
 Write-Host "Note: NAT networking is required for nested VMs in Azure`n" -ForegroundColor Cyan
 
 $createNatSwitchScript = @'
@@ -228,7 +211,7 @@ try {
 # ============================================
 # 4. Configure DHCP Server
 # ============================================
-Write-Host "`n[3/4] Configuring DHCP server..." -ForegroundColor Yellow
+Write-Host "`n[3/7] Configuring DHCP server..." -ForegroundColor Yellow
 Write-Host "Note: DHCP provides automatic IP addresses to nested VMs`n" -ForegroundColor Cyan
 
 $configureDhcpScript = @'
@@ -240,7 +223,7 @@ $StartRange = "192.168.100.10"
 $EndRange = "192.168.100.200"
 $SubnetMask = "255.255.255.0"
 $GatewayIP = "192.168.100.1"
-$DnsServer = "168.63.129.16"  # Azure DNS
+$DnsServer = "192.168.100.20"  # ADDS VM (Domain Controller / DNS Server)
 
 # Check if DHCP Server is already installed
 $dhcpFeature = Get-WindowsFeature -Name DHCP
@@ -276,7 +259,7 @@ Write-Host "Configuring DHCP options..."
 Set-DhcpServerv4OptionValue -ScopeId $ScopeId -Router $GatewayIP -ErrorAction SilentlyContinue
 Set-DhcpServerv4OptionValue -ScopeId $ScopeId -DnsServer $DnsServer -ErrorAction SilentlyContinue
 Write-Host "  Router (Gateway): $GatewayIP"
-Write-Host "  DNS Server: $DnsServer (Azure DNS)"
+Write-Host "  DNS Server: $DnsServer (ADDS VM - Domain Controller)"
 
 # Authorize DHCP server in AD (skip if not domain-joined)
 Write-Host "Skipping AD authorization (standalone server)"
@@ -322,7 +305,7 @@ try {
 # ============================================
 # 5. Configure Port Forwarding for Bastion Tunneling
 # ============================================
-Write-Host "`n[4/5] Configuring port forwarding for az-migrate appliance..." -ForegroundColor Yellow
+Write-Host "`n[4/7] Configuring port forwarding for az-migrate appliance..." -ForegroundColor Yellow
 Write-Host "Note: Enables RDP access via Bastion tunnel`n" -ForegroundColor Cyan
 
 $configurePortForwardingScript = @'
@@ -388,7 +371,7 @@ try {
 # ============================================
 # 6. Configure WinRM for Azure Migrate Discovery
 # ============================================
-Write-Host "`n[5/5] Configuring WinRM for Azure Migrate communication..." -ForegroundColor Yellow
+Write-Host "`n[5/7] Configuring WinRM for Azure Migrate communication..." -ForegroundColor Yellow
 Write-Host "Note: Azure Migrate appliance uses WinRM to discover and assess VMs`n" -ForegroundColor Cyan
 
 $configureWinRMScript = @'
@@ -497,6 +480,235 @@ try {
 }
 
 # ============================================
+# 6. Install MARS Agent (must be installed BEFORE ASR Provider)
+# ============================================
+Write-Host "`n[6/7] Installing Microsoft Azure Recovery Services (MARS) Agent..." -ForegroundColor Yellow
+Write-Host "Note: Required for Azure Migrate replication - must be installed before ASR Provider`n" -ForegroundColor Cyan
+
+$installMARSAgentScript = @'
+$ErrorActionPreference = 'Stop'
+
+$DownloadUrl = "https://aka.ms/azurebackup_agent"
+$InstallerPath = "C:\Windows\Temp\MARSAgentInstaller.exe"
+$MARSInstallDir = "C:\Program Files\Microsoft Azure Recovery Services Agent"
+
+# Check if MARS Agent is already installed
+if (Test-Path $MARSInstallDir) {
+    Write-Host "MARS Agent is already installed at $MARSInstallDir"
+    $obService = Get-Service -Name "obengine" -ErrorAction SilentlyContinue
+    if ($obService) { Write-Host "Service status: $($obService.Status)" }
+    exit 0
+}
+
+$regCheck = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -EA SilentlyContinue |
+    Where-Object { $_.DisplayName -match 'Microsoft Azure Recovery Services Agent' }
+if ($regCheck) {
+    Write-Host "MARS Agent is already installed: $($regCheck.DisplayName) v$($regCheck.DisplayVersion)"
+    exit 0
+}
+
+# Download the installer
+Write-Host "Downloading MARS Agent..."
+Write-Host "Source: $DownloadUrl"
+
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$ProgressPreference = 'SilentlyContinue'
+
+try {
+    Invoke-WebRequest -Uri $DownloadUrl -OutFile $InstallerPath -UseBasicParsing
+} catch {
+    Write-Host "ERROR: Failed to download MARS Agent: $($_.Exception.Message)"
+    exit 1
+}
+
+if (-not (Test-Path $InstallerPath)) {
+    Write-Host "ERROR: Installer not found after download"
+    exit 1
+}
+
+$fileSize = (Get-Item $InstallerPath).Length / 1MB
+Write-Host "Downloaded: $([math]::Round($fileSize, 2)) MB"
+
+# Install silently
+Write-Host "Installing MARS Agent..."
+$installProcess = Start-Process -FilePath $InstallerPath `
+    -ArgumentList "/q /nu" `
+    -Wait -PassThru
+
+if ($installProcess.ExitCode -ne 0) {
+    Write-Host "WARNING: MARS installer exited with code $($installProcess.ExitCode)"
+}
+
+# Verify installation
+if (Test-Path $MARSInstallDir) {
+    Write-Host "MARS Agent installed successfully!"
+    $regInfo = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -EA SilentlyContinue |
+        Where-Object { $_.DisplayName -match 'Microsoft Azure Recovery Services Agent' }
+    if ($regInfo) { Write-Host "Version: $($regInfo.DisplayVersion)" }
+} else {
+    Write-Host "Installation completed - may require reboot to finalize"
+}
+
+# Clean up
+Remove-Item $InstallerPath -Force -ErrorAction SilentlyContinue
+
+Write-Host "MARS Agent installation complete"
+'@
+
+try {
+    $tempFile = [System.IO.Path]::GetTempFileName() + ".ps1"
+    $installMARSAgentScript | Out-File -FilePath $tempFile -Encoding ASCII
+
+    $output = & az vm run-command invoke `
+        --resource-group $ResourceGroupName `
+        --name $VMName `
+        --command-id RunPowerShellScript `
+        --scripts "@$tempFile" `
+        --output json 2>$null
+
+    Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+
+    $result = ($output | ConvertFrom-Json).value
+    $stdOut = ($result | Where-Object { $_.code -like '*StdOut*' }).message
+    $stdErr = ($result | Where-Object { $_.code -like '*StdErr*' }).message
+
+    if ($stdOut) { Write-Host $stdOut -ForegroundColor Gray }
+    if ($stdErr) { Write-Host $stdErr -ForegroundColor Yellow }
+
+    Write-Host "MARS Agent installation complete!" -ForegroundColor Green
+} catch {
+    Write-Host "ERROR: Failed to install MARS Agent: $_" -ForegroundColor Red
+    Write-Host "You may need to install it manually from https://aka.ms/azurebackup_agent" -ForegroundColor Yellow
+}
+
+# ============================================
+# 7. Install Azure Site Recovery Provider
+# ============================================
+Write-Host "`n[7/7] Installing Azure Site Recovery Provider..." -ForegroundColor Yellow
+Write-Host "Note: Required for Hyper-V replication to Azure`n" -ForegroundColor Cyan
+
+$installASRProviderScript = @'
+$ErrorActionPreference = 'Stop'
+
+$DownloadUrl = "https://aka.ms/downloaddra"
+$InstallerPath = "C:\Windows\Temp\AzureSiteRecoveryProvider.exe"
+$ExtractPath = "C:\Windows\Temp\ASRProvider"
+$ProviderInstallDir = "C:\Program Files\Microsoft Azure Site Recovery Provider"
+
+# Check if ASR Provider is already installed (check install directory and registry)
+if (Test-Path $ProviderInstallDir) {
+    Write-Host "Azure Site Recovery Provider is already installed at $ProviderInstallDir"
+    $asrService = Get-Service -Name "dra" -ErrorAction SilentlyContinue
+    if ($asrService) { Write-Host "Service status: $($asrService.Status)" }
+    exit 0
+}
+
+$regCheck = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -EA SilentlyContinue |
+    Where-Object { $_.DisplayName -match 'Azure Site Recovery' }
+if ($regCheck) {
+    Write-Host "Azure Site Recovery Provider is already installed: $($regCheck.DisplayName)"
+    exit 0
+}
+
+# Download the installer
+Write-Host "Downloading Azure Site Recovery Provider..."
+Write-Host "Source: $DownloadUrl"
+
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$ProgressPreference = 'SilentlyContinue'
+
+try {
+    Invoke-WebRequest -Uri $DownloadUrl -OutFile $InstallerPath -UseBasicParsing
+} catch {
+    Write-Host "ERROR: Failed to download ASR Provider: $($_.Exception.Message)"
+    exit 1
+}
+
+if (-not (Test-Path $InstallerPath)) {
+    Write-Host "ERROR: Installer not found after download"
+    exit 1
+}
+
+$fileSize = (Get-Item $InstallerPath).Length / 1MB
+Write-Host "Downloaded: $([math]::Round($fileSize, 2)) MB"
+
+# Extract the self-extracting archive first
+Write-Host "Extracting ASR Provider installer..."
+if (Test-Path $ExtractPath) { Remove-Item $ExtractPath -Recurse -Force }
+$extractProcess = Start-Process -FilePath $InstallerPath `
+    -ArgumentList "/x:$ExtractPath", "/q" `
+    -Wait -PassThru
+
+if ($extractProcess.ExitCode -ne 0) {
+    Write-Host "ERROR: Extraction failed with exit code $($extractProcess.ExitCode)"
+    exit 1
+}
+Write-Host "Extracted to $ExtractPath"
+
+# Run the MSI installer silently
+$msiFile = Join-Path $ExtractPath "asradapter.msi"
+
+if ($msiFile -and (Test-Path $msiFile)) {
+    Write-Host "Running MSI install: $msiFile"
+    $installProcess = Start-Process -FilePath "msiexec" `
+        -ArgumentList "/i", "`"$msiFile`"", "/qn" `
+        -Wait -PassThru
+
+    if ($installProcess.ExitCode -ne 0) {
+        Write-Host "WARNING: MSI install exited with code $($installProcess.ExitCode)"
+    }
+} else {
+    Write-Host "ERROR: Could not find asradapter.msi in $ExtractPath"
+    Get-ChildItem $ExtractPath -Recurse | ForEach-Object { Write-Host $_.FullName }
+    exit 1
+}
+
+# Verify installation
+if (Test-Path $ProviderInstallDir) {
+    Write-Host "Azure Site Recovery Provider installed successfully!"
+} else {
+    $asrService = Get-Service -Name "dra" -ErrorAction SilentlyContinue
+    if ($asrService) {
+        Write-Host "Azure Site Recovery Provider installed (service found)"
+    } else {
+        Write-Host "Installation completed - may require reboot to finalize"
+    }
+}
+
+# Clean up
+Remove-Item $InstallerPath -Force -ErrorAction SilentlyContinue
+Remove-Item $ExtractPath -Recurse -Force -ErrorAction SilentlyContinue
+
+Write-Host "ASR Provider installation complete"
+'@
+
+try {
+    $tempFile = [System.IO.Path]::GetTempFileName() + ".ps1"
+    $installASRProviderScript | Out-File -FilePath $tempFile -Encoding ASCII
+
+    $output = & az vm run-command invoke `
+        --resource-group $ResourceGroupName `
+        --name $VMName `
+        --command-id RunPowerShellScript `
+        --scripts "@$tempFile" `
+        --output json 2>$null
+
+    Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+
+    $result = ($output | ConvertFrom-Json).value
+    $stdOut = ($result | Where-Object { $_.code -like '*StdOut*' }).message
+    $stdErr = ($result | Where-Object { $_.code -like '*StdErr*' }).message
+
+    if ($stdOut) { Write-Host $stdOut -ForegroundColor Gray }
+    if ($stdErr) { Write-Host $stdErr -ForegroundColor Yellow }
+
+    Write-Host "ASR Provider installation complete!" -ForegroundColor Green
+} catch {
+    Write-Host "ERROR: Failed to install ASR Provider: $_" -ForegroundColor Red
+    Write-Host "You may need to install it manually from https://aka.ms/downloaddra" -ForegroundColor Yellow
+}
+
+# ============================================
 # Summary
 # ============================================
 Write-Host "`n=== Preparation Complete ===" -ForegroundColor Yellow
@@ -505,11 +717,14 @@ Write-Host "NAT switch configured for nested VM internet access" -ForegroundColo
 Write-Host "DHCP server configured for automatic IP assignment" -ForegroundColor Cyan
 Write-Host "Port forwarding configured for az-migrate RDP (port 33389)" -ForegroundColor Cyan
 Write-Host "WinRM configured for Azure Migrate discovery and assessment" -ForegroundColor Cyan
+Write-Host "MARS Agent installed (required for replication version reporting)" -ForegroundColor Cyan
+Write-Host "Azure Site Recovery Provider installed for Hyper-V replication" -ForegroundColor Cyan
 Write-Host "`nNext Steps:" -ForegroundColor Yellow
-Write-Host "1. Run 03-deploy-azure-migrate.ps1 to deploy Azure Migrate appliance" -ForegroundColor Cyan
-Write-Host "2. Run 04-deploy-webapp.ps1 to deploy the Webapp VM" -ForegroundColor Cyan
-Write-Host "3. Run 05-deploy-ubuntu.ps1 to deploy the Ubuntu VM" -ForegroundColor Cyan
-Write-Host "4. Use Azure Migrate portal to discover and register Hyper-V hosts" -ForegroundColor Cyan
+Write-Host "1. Run 06-deploy-adds.ps1 to deploy the ADDS VM (DNS server)" -ForegroundColor Cyan
+Write-Host "2. Run 03-deploy-azure-migrate.ps1 to deploy Azure Migrate appliance" -ForegroundColor Cyan
+Write-Host "3. Verify DNS resolution via ADDS VM before deploying Ubuntu VMs" -ForegroundColor Cyan
+Write-Host "4. Run 04-deploy-webapp.ps1 to deploy the Webapp VM" -ForegroundColor Cyan
+Write-Host "5. Run 05-deploy-ubuntu.ps1 to deploy the Ubuntu VM" -ForegroundColor Cyan
 Write-Host ""
 
 exit 0

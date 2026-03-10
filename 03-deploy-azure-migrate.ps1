@@ -284,9 +284,7 @@ Write-Host "Solutions created" -ForegroundColor Green
 
 Write-Host "`nDeployed Azure resources:" -ForegroundColor Cyan
 Write-Host "  Migrate Project:  $($deployOutput.migrateProjectName.value)" -ForegroundColor Gray
-Write-Host "  Recovery Vault:   $($deployOutput.recoveryVaultName.value)" -ForegroundColor Gray
 Write-Host "  Target VNet:      $($deployOutput.targetVnetName.value)" -ForegroundColor Gray
-Write-Host "  Storage Account:  $($deployOutput.replicationStorageAccountName.value)" -ForegroundColor Gray
 
 # --- Create Hyper-V discovery site and generate appliance key ---
 Write-Host "`nCreating Hyper-V discovery site..." -ForegroundColor Yellow
@@ -357,9 +355,7 @@ Write-Host "`n=== Azure Migrate Deployment Complete ===" -ForegroundColor Yellow
 Write-Host "`nAzure Resources:" -ForegroundColor Yellow
 Write-Host "  - Migrate Project:  $($deployOutput.migrateProjectName.value)" -ForegroundColor Cyan
 Write-Host "  - Hyper-V Site:     $HyperVSiteName" -ForegroundColor Cyan
-Write-Host "  - Recovery Vault:   $($deployOutput.recoveryVaultName.value)" -ForegroundColor Cyan
 Write-Host "  - Target VNet:      $($deployOutput.targetVnetName.value)" -ForegroundColor Cyan
-Write-Host "  - Storage Account:  $($deployOutput.replicationStorageAccountName.value)" -ForegroundColor Cyan
 
 Write-Host "`nAppliance VM on DC host:" -ForegroundColor Yellow
 Write-Host "  - Downloaded and imported into Hyper-V" -ForegroundColor Cyan
@@ -371,5 +367,7 @@ Write-Host "2. Open Hyper-V Manager and connect to 'az-migrate' VM" -ForegroundC
 Write-Host "3. Generate appliance key in Azure Portal:" -ForegroundColor Cyan
 Write-Host "   Azure Migrate > Servers, databases and web apps > Discover > Generate Key" -ForegroundColor Gray
 Write-Host "4. Complete the Azure Migrate appliance configuration wizard" -ForegroundColor Cyan
-Write-Host "5. Configure discovery for the Ubuntu VM" -ForegroundColor Cyan
+Write-Host "5. Configure discovery for the nested VMs" -ForegroundColor Cyan
 Write-Host ""
+
+exit 0

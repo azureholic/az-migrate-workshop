@@ -137,7 +137,6 @@ Write-Host "`nADDS VM creation completed!" -ForegroundColor Green
 # Summary
 # ============================================
 Write-Host "`n=== Windows Server 2019 ADDS VM Deployment Complete ===" -ForegroundColor Yellow
-Write-Host "ADDS VM is now running on the DC host with unattended installation" -ForegroundColor Cyan
 Write-Host "`nWhat happened:" -ForegroundColor Yellow
 Write-Host "1. Downloaded Windows Server 2019 ADDS autoinstall ISO to $VMFilesPath" -ForegroundColor Cyan
 Write-Host "2. Created ADDS VM in Hyper-V with:" -ForegroundColor Cyan
@@ -147,11 +146,6 @@ Write-Host "   - 80GB VHD" -ForegroundColor Gray
 Write-Host "   - TPM enabled (if available)" -ForegroundColor Gray
 Write-Host "   - Static IP: 192.168.100.20 (DHCP reservation)" -ForegroundColor Gray
 Write-Host "   - Autoinstall ISO attached" -ForegroundColor Gray
-Write-Host "3. VM is now installing Windows Server 2019 and configuring AD DS" -ForegroundColor Cyan
-Write-Host "`nNext Steps:" -ForegroundColor Yellow
-Write-Host "1. Installation will take ~15-30 minutes" -ForegroundColor Cyan
-Write-Host "2. Monitor installation via Hyper-V Manager on the DC VM" -ForegroundColor Cyan
-Write-Host "3. After installation, VM will reboot and become a Domain Controller" -ForegroundColor Cyan
-Write-Host "4. Credentials: MIGRATE\Administrator or Administrator@migrate.local / Windows123!" -ForegroundColor Cyan
-Write-Host "5. Remove the ISO from the DVD drive after the first successful reboot" -ForegroundColor Cyan
+Write-Host "`nThe VM will autoconfigure AD DS, DNS, and DNS forwarding during first boot" -ForegroundColor Cyan
+Write-Host "Credentials: MIGRATE\Administrator or Administrator@migrate.local / Windows123!" -ForegroundColor Cyan
 Write-Host ""
