@@ -322,7 +322,7 @@ try {
 # ============================================
 # 5. Configure Port Forwarding for Bastion Tunneling
 # ============================================
-Write-Host "`n[4/4] Configuring port forwarding for az-migrate appliance..." -ForegroundColor Yellow
+Write-Host "`n[4/5] Configuring port forwarding for az-migrate appliance..." -ForegroundColor Yellow
 Write-Host "Note: Enables RDP access via Bastion tunnel`n" -ForegroundColor Cyan
 
 $configurePortForwardingScript = @'
@@ -386,6 +386,117 @@ try {
 }
 
 # ============================================
+# 6. Configure WinRM for Azure Migrate Discovery
+# ============================================
+Write-Host "`n[5/5] Configuring WinRM for Azure Migrate communication..." -ForegroundColor Yellow
+Write-Host "Note: Azure Migrate appliance uses WinRM to discover and assess VMs`n" -ForegroundColor Cyan
+
+$configureWinRMScript = @'
+$ErrorActionPreference = 'Stop'
+
+# Enable WinRM service
+Write-Host "Enabling WinRM service..."
+Enable-PSRemoting -Force -SkipNetworkProfileCheck
+
+# Configure WinRM to listen on all interfaces
+Write-Host "Configuring WinRM listeners..."
+winrm quickconfig -quiet -force
+
+# Set WinRM service to automatic startup
+Set-Service -Name WinRM -StartupType Automatic
+Start-Service -Name WinRM
+
+# Configure TrustedHosts to allow connections from NAT network
+Write-Host "Configuring TrustedHosts for NAT network (192.168.100.0/24)..."
+$currentTrustedHosts = (Get-Item WSMan:\localhost\Client\TrustedHosts).Value
+if ($currentTrustedHosts -eq "") {
+    Set-Item WSMan:\localhost\Client\TrustedHosts -Value "192.168.100.*" -Force
+} elseif ($currentTrustedHosts -notlike "*192.168.100.*") {
+    Set-Item WSMan:\localhost\Client\TrustedHosts -Value "$currentTrustedHosts,192.168.100.*" -Force
+}
+Write-Host "  TrustedHosts: $(Get-Item WSMan:\localhost\Client\TrustedHosts | Select-Object -ExpandProperty Value)"
+
+# Enable CredSSP for Azure Migrate (allows credential delegation)
+Write-Host "Enabling CredSSP authentication..."
+Enable-WSManCredSSP -Role Server -Force | Out-Null
+Write-Host "  CredSSP Server enabled"
+
+# Configure firewall rules for WinRM from NAT network
+Write-Host "`nConfiguring Windows Firewall for WinRM..."
+
+# Remove existing rules if present
+Remove-NetFirewallRule -DisplayName "WinRM-HTTP-NAT-In" -ErrorAction SilentlyContinue
+Remove-NetFirewallRule -DisplayName "WinRM-HTTPS-NAT-In" -ErrorAction SilentlyContinue
+
+# Add firewall rules for NAT network only
+New-NetFirewallRule -DisplayName "WinRM-HTTP-NAT-In" `
+    -Direction Inbound `
+    -LocalPort 5985 `
+    -Protocol TCP `
+    -Action Allow `
+    -RemoteAddress "192.168.100.0/24" `
+    -Profile Any | Out-Null
+Write-Host "  Firewall rule added: WinRM-HTTP-NAT-In (port 5985)"
+
+New-NetFirewallRule -DisplayName "WinRM-HTTPS-NAT-In" `
+    -Direction Inbound `
+    -LocalPort 5986 `
+    -Protocol TCP `
+    -Action Allow `
+    -RemoteAddress "192.168.100.0/24" `
+    -Profile Any | Out-Null
+Write-Host "  Firewall rule added: WinRM-HTTPS-NAT-In (port 5986)"
+
+# Increase MaxMemoryPerShellMB for large operations
+Write-Host "Configuring WinRM memory limits..."
+Set-Item WSMan:\localhost\Shell\MaxMemoryPerShellMB -Value 2048 -Force
+Write-Host "  MaxMemoryPerShellMB: 2048"
+
+# Test WinRM configuration
+Write-Host "`nTesting WinRM configuration..."
+$winrmStatus = Test-WSMan -ComputerName localhost
+if ($winrmStatus) {
+    Write-Host "  WinRM is responding correctly" -ForegroundColor Green
+}
+
+Write-Host "`nWinRM Configuration Complete:"
+Write-Host "  Service: Running (Automatic)"
+Write-Host "  HTTP Port: 5985"
+Write-Host "  HTTPS Port: 5986"
+Write-Host "  Allowed Network: 192.168.100.0/24 (NAT network)"
+Write-Host "  CredSSP: Enabled"
+Write-Host "  TrustedHosts: $(Get-Item WSMan:\localhost\Client\TrustedHosts | Select-Object -ExpandProperty Value)"
+Write-Host "`nAzure Migrate appliance can now connect to this host via WinRM"
+'@
+
+try {
+    $tempFile = [System.IO.Path]::GetTempFileName() + ".ps1"
+    $configureWinRMScript | Out-File -FilePath $tempFile -Encoding ASCII
+
+    $output = & az vm run-command invoke `
+        --resource-group $ResourceGroupName `
+        --name $VMName `
+        --command-id RunPowerShellScript `
+        --scripts "@$tempFile" `
+        --output json 2>$null
+
+    Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+
+    $result = ($output | ConvertFrom-Json).value
+    $stdOut = ($result | Where-Object { $_.code -like '*StdOut*' }).message
+    $stdErr = ($result | Where-Object { $_.code -like '*StdErr*' }).message
+    
+    if ($stdOut) { Write-Host $stdOut -ForegroundColor Gray }
+    if ($stdErr) { Write-Host $stdErr -ForegroundColor Yellow }
+    
+    Write-Host "WinRM configuration complete!" -ForegroundColor Green
+} catch {
+    Write-Host "ERROR: Failed to configure WinRM: $_" -ForegroundColor Red
+    Write-Host "You may need to configure WinRM manually" -ForegroundColor Yellow
+    # Don't exit - WinRM is important but not critical for basic setup
+}
+
+# ============================================
 # Summary
 # ============================================
 Write-Host "`n=== Preparation Complete ===" -ForegroundColor Yellow
@@ -393,6 +504,7 @@ Write-Host "Hyper-V is now enabled on the DC VM" -ForegroundColor Cyan
 Write-Host "NAT switch configured for nested VM internet access" -ForegroundColor Cyan
 Write-Host "DHCP server configured for automatic IP assignment" -ForegroundColor Cyan
 Write-Host "Port forwarding configured for az-migrate RDP (port 33389)" -ForegroundColor Cyan
+Write-Host "WinRM configured for Azure Migrate discovery and assessment" -ForegroundColor Cyan
 Write-Host "`nNext Steps:" -ForegroundColor Yellow
 Write-Host "1. Run 03-deploy-azure-migrate.ps1 to deploy Azure Migrate appliance" -ForegroundColor Cyan
 Write-Host "2. Run 04-deploy-webapp.ps1 to deploy the Webapp VM" -ForegroundColor Cyan

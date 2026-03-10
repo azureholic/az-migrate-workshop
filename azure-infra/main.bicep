@@ -1,8 +1,11 @@
 @description('Location for all resources')
 param location string = resourceGroup().location
 
-@description('Name of the Azure Migrate project')
-param migrateProjectName string = 'migrate-project'
+@description('Base name for the Azure Migrate project (timestamp will be appended for uniqueness)')
+param migrateProjectBaseName string = 'migrate-project'
+
+@description('Timestamp for unique resource naming')
+param timestamp string = utcNow('yyyyMMdd-HHmmss')
 
 @description('Virtual Network address prefix for migrated VMs')
 param vnetAddressPrefix string = '10.1.0.0/16'
@@ -33,7 +36,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
 
 // Azure Migrate Project with System Assigned Identity
 resource migrateProject 'Microsoft.Migrate/migrateProjects@2020-05-01' = {
-  name: migrateProjectName
+  name: '${migrateProjectBaseName}-${timestamp}'
   location: location
   #disable-next-line BCP187
   identity: {
