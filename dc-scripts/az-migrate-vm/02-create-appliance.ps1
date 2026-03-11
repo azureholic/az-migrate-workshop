@@ -268,14 +268,19 @@ try {
     Get-VMNetworkAdapter -VMName $VMName | Connect-VMNetworkAdapter -SwitchName $SwitchName
     Write-Host "Network: Connected to $SwitchName" -ForegroundColor Gray
 
+    # Set static MAC address so we have a known MAC for DHCP reservation before VM starts
+    # (Dynamic MACs are only assigned at VM start, so Get-VMNetworkAdapter returns 000000000000 before that)
+    $staticMac = "00155D100010"
+    Set-VMNetworkAdapter -VMName $VMName -StaticMacAddress $staticMac
+    $macAddress = $staticMac -replace '(..)(..)(..)(..)(..)(..)','$1-$2-$3-$4-$5-$6'
+    Write-Host "Static MAC address set: $macAddress" -ForegroundColor Gray
+
     # Enable guest services
     Enable-VMIntegrationService -VMName $VMName -Name "Guest Service Interface" -ErrorAction SilentlyContinue
     Write-Host "Guest services enabled" -ForegroundColor Gray
 
     # Add DHCP reservation BEFORE starting VM so first DHCP response has the correct IP
     Write-Host "`nConfiguring DHCP reservation for static IP..." -ForegroundColor Cyan
-    $vmNetAdapter = Get-VMNetworkAdapter -VMName $VMName
-    $macAddress = $vmNetAdapter.MacAddress -replace '(..)(..)(..)(..)(..)(..)','$1-$2-$3-$4-$5-$6'
     
     # Remove existing reservation if present
     Get-DhcpServerv4Reservation -ScopeId 192.168.100.0 -ErrorAction SilentlyContinue | 

@@ -1,7 +1,6 @@
 # Create Ubuntu Webapp VM in Hyper-V with Fully Unattended Setup
 # This script runs on the DC VM
-# Uses Gen 2 VM (UEFI boot) with a pre-built autoinstall ISO.
-# Secure boot is disabled for Ubuntu compatibility.
+# Uses Gen 1 VM (BIOS boot) with a pre-built autoinstall ISO.
 
 param(
     [string]$VMName = "webapp-vm",
@@ -93,12 +92,12 @@ if ($existingVM) {
     exit 1
 }
 
-# Create the VM (Gen 2 for UEFI boot - required for modern Ubuntu)
-Write-Host "Creating VM: $VMName (Generation 2)" -ForegroundColor Cyan
+# Create the VM (Gen 1 for BIOS boot)
+Write-Host "Creating VM: $VMName (Generation 1)" -ForegroundColor Cyan
 
 New-VM -Name $VMName `
     -MemoryStartupBytes $MemoryStartupBytes `
-    -Generation 2 `
+    -Generation 1 `
     -NewVHDPath $VHDPath `
     -NewVHDSizeBytes $VHDSize `
     -SwitchName $SwitchName `
@@ -119,18 +118,13 @@ Write-Host "Processors: $ProcessorCount" -ForegroundColor Gray
 Set-VMMemory -VMName $VMName -DynamicMemoryEnabled $true -MinimumBytes 2GB -MaximumBytes $MemoryStartupBytes
 Write-Host "Memory: Dynamic (2GB - $([math]::Round($MemoryStartupBytes/1GB))GB)" -ForegroundColor Gray
 
-# Disable Secure Boot for Ubuntu (use Microsoft UEFI CA for third-party OS)
-Set-VMFirmware -VMName $VMName -EnableSecureBoot Off
-Write-Host "Secure Boot: Disabled (for Ubuntu compatibility)" -ForegroundColor Gray
-
-# Add DVD drive and attach the autoinstall ISO (Gen 2 VMs don't have DVD by default)
-Add-VMDvdDrive -VMName $VMName -Path $IsoPath
+# Attach the autoinstall ISO to the built-in IDE DVD drive
+Set-VMDvdDrive -VMName $VMName -Path $IsoPath
 Write-Host "Autoinstall ISO attached to DVD" -ForegroundColor Gray
 
-# Set boot order: DVD first
-$bootDvd = Get-VMDvdDrive -VMName $VMName
-Set-VMFirmware -VMName $VMName -FirstBootDevice $bootDvd
-Write-Host "Boot order: DVD first" -ForegroundColor Gray
+# Set boot order: CD first (Gen 1 uses BIOS boot order)
+Set-VMBios -VMName $VMName -StartupOrder @('CD', 'IDE', 'LegacyNetworkAdapter', 'Floppy')
+Write-Host "Boot order: CD first" -ForegroundColor Gray
 
 # Enable guest services (for integration)
 Enable-VMIntegrationService -VMName $VMName -Name "Guest Service Interface"
@@ -156,7 +150,7 @@ Write-Host "Uptime: $($vm.Uptime)" -ForegroundColor Gray
 Write-Host "`n=== VM Creation Complete ===" -ForegroundColor Yellow
 Write-Host "VM Details:" -ForegroundColor Cyan
 Write-Host "  Name: $VMName" -ForegroundColor Gray
-Write-Host "  Generation: 2 (UEFI, Secure Boot Off)" -ForegroundColor Gray
+Write-Host "  Generation: 1 (BIOS)" -ForegroundColor Gray
 Write-Host "  State: $($vm.State)" -ForegroundColor Gray
 Write-Host "  CPUs: $ProcessorCount" -ForegroundColor Gray
 Write-Host "  Memory: $([math]::Round($MemoryStartupBytes/1GB))GB" -ForegroundColor Gray
