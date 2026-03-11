@@ -146,13 +146,12 @@ $PrefixLength = 24
 $existingSwitch = Get-VMSwitch -Name $SwitchName -ErrorAction SilentlyContinue
 if ($existingSwitch) {
     Write-Host "NAT switch already exists: $SwitchName"
-    exit 0
+} else {
+    Write-Host "Creating Internal virtual switch: $SwitchName"
+    New-VMSwitch -Name $SwitchName -SwitchType Internal
 }
 
-Write-Host "Creating Internal virtual switch: $SwitchName"
-New-VMSwitch -Name $SwitchName -SwitchType Internal
-
-# Get the adapter created for the internal switch
+# Get the adapter for the internal switch
 $adapter = Get-NetAdapter | Where-Object { $_.Name -like "*$SwitchName*" }
 if (-not $adapter) {
     # Try alternative naming
@@ -162,6 +161,10 @@ if (-not $adapter) {
 if ($adapter) {
     Write-Host "Configuring IP address on adapter: $($adapter.Name)"
     New-NetIPAddress -IPAddress $GatewayIP -PrefixLength $PrefixLength -InterfaceIndex $adapter.ifIndex -ErrorAction SilentlyContinue
+    
+    # Enable IP forwarding so nested VM traffic is routed through NAT
+    Set-NetIPInterface -InterfaceIndex $adapter.ifIndex -Forwarding Enabled
+    Write-Host "IP forwarding enabled on adapter: $($adapter.Name)"
 } else {
     Write-Host "WARNING: Could not find adapter for internal switch"
 }
@@ -257,7 +260,7 @@ if ($existingScope) {
 # Configure scope options (gateway and DNS)
 Write-Host "Configuring DHCP options..."
 Set-DhcpServerv4OptionValue -ScopeId $ScopeId -Router $GatewayIP -ErrorAction SilentlyContinue
-Set-DhcpServerv4OptionValue -ScopeId $ScopeId -DnsServer $DnsServer -ErrorAction SilentlyContinue
+Set-DhcpServerv4OptionValue -ScopeId $ScopeId -DnsDomain "migrate.local" -DnsServer $DnsServer -Force -ErrorAction Stop
 Write-Host "  Router (Gateway): $GatewayIP"
 Write-Host "  DNS Server: $DnsServer (ADDS VM - Domain Controller)"
 
@@ -720,11 +723,11 @@ Write-Host "WinRM configured for Azure Migrate discovery and assessment" -Foregr
 Write-Host "MARS Agent installed (required for replication version reporting)" -ForegroundColor Cyan
 Write-Host "Azure Site Recovery Provider installed for Hyper-V replication" -ForegroundColor Cyan
 Write-Host "`nNext Steps:" -ForegroundColor Yellow
-Write-Host "1. Run 06-deploy-adds.ps1 to deploy the ADDS VM (DNS server)" -ForegroundColor Cyan
-Write-Host "2. Run 03-deploy-azure-migrate.ps1 to deploy Azure Migrate appliance" -ForegroundColor Cyan
+Write-Host "1. Run 03-deploy-adds.ps1 to deploy the ADDS VM (DNS server)" -ForegroundColor Cyan
+Write-Host "2. Run 04-deploy-azure-migrate.ps1 to deploy Azure Migrate appliance" -ForegroundColor Cyan
 Write-Host "3. Verify DNS resolution via ADDS VM before deploying Ubuntu VMs" -ForegroundColor Cyan
-Write-Host "4. Run 04-deploy-webapp.ps1 to deploy the Webapp VM" -ForegroundColor Cyan
-Write-Host "5. Run 05-deploy-ubuntu.ps1 to deploy the Ubuntu VM" -ForegroundColor Cyan
+Write-Host "4. Run 05-deploy-webapp.ps1 to deploy the Webapp VM" -ForegroundColor Cyan
+Write-Host "5. Run 06-deploy-ubuntu.ps1 to deploy the Ubuntu VM" -ForegroundColor Cyan
 Write-Host ""
 
 exit 0
