@@ -1,0 +1,156 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f5f5f5;
+  color: #333;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+header {
+  background: #2c3e50;
+  padding: 20px;
+  margin: -20px -20px 20px -20px;
+  border-radius: 8px 8px 0 0;
+}
+
+header h1 a {
+  color: white;
+  text-decoration: none;
+}
+
+main {
+  background: white;
+  padding: 20px;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.actions {
+  margin-bottom: 20px;
+}
+
+.btn {
+  display: inline-block;
+  padding: 10px 20px;
+  background: #95a5a6;
+  color: white;
+  text-decoration: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn:hover {
+  opacity: 0.9;
+}
+
+.btn-primary {
+  background: #3498db;
+}
+
+.btn-danger {
+  background: #e74c3c;
+}
+
+.btn-small {
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+th {
+  background: #f8f9fa;
+  font-weight: 600;
+}
+
+tr:hover {
+  background: #f8f9fa;
+}
+
+.actions-cell {
+  white-space: nowrap;
+}
+
+.inline-form {
+  display: inline;
+}
+
+.empty-state {
+  text-align: center;
+  color: #7f8c8d;
+  padding: 40px;
+}
+
+.alert {
+  padding: 12px 16px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.alert-error {
+  background: #fee;
+  border: 1px solid #fcc;
+  color: #c00;
+}
+
+.product-form {
+  max-width: 500px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.form-actions {
+  margin-top: 20px;
+}
+
+.form-actions .btn {
+  margin-right: 10px;
+}
+
+h2 {
+  margin-bottom: 20px;
+  color: #2c3e50;
+}

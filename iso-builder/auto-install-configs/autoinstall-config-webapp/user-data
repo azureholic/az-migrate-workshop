@@ -1,0 +1,48 @@
+#cloud-config
+autoinstall:
+  version: 1
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  identity:
+    hostname: ubuntu-webapp
+    username: ubuntu
+    password: '$6$OOtc7wccF0hs8EWz$LNov88z3z/aTSZAJSCo2xa7dt8hMlVnRF5GSGZ/Mijt5ROPyvI8o7W44Np/dxUTok8Nqnm8q2a/Tf/hgy.FT21'
+  ssh:
+    install-server: true
+    allow-pw: true
+  network:
+    ethernets:
+      eth0:
+        dhcp4: true
+    version: 2
+  storage:
+    layout:
+      name: lvm
+  packages:
+    - openssh-server
+    - curl
+    - wget
+    - linux-cloud-tools-virtual
+    - linux-tools-virtual
+    - postgresql
+    - postgresql-contrib
+    - ca-certificates
+    - gnupg
+  late-commands:
+    - curtin in-target --target=/target -- systemctl enable ssh
+    # Copy webapp from ISO to target
+    - mkdir -p /target/opt/webapp
+    - cp -r /cdrom/webapp/* /target/opt/webapp/
+    - chmod +x /target/opt/webapp/setup-db.sh
+    # Install Node.js 20.x
+    - curtin in-target --target=/target -- bash -c 'curl -fsSL https://deb.nodesource.com/setup_20.x | bash -'
+    - curtin in-target --target=/target -- apt-get install -y nodejs
+    # Install PM2 globally
+    - curtin in-target --target=/target -- npm install -g pm2
+    # Install systemd service that sets up DB and app on first boot
+    - cp /target/opt/webapp/webapp-setup.service /target/etc/systemd/system/
+    - curtin in-target --target=/target -- systemctl enable postgresql
+    - curtin in-target --target=/target -- systemctl enable webapp-setup.service
+  user-data:
+    disable_root: true

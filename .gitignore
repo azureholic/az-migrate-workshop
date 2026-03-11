@@ -9,3 +9,11 @@
 
 # Azure CLI output
 *.json.tmp
+
+# Node.js
+iso-builder/webapp/node_modules/
+iso-builder/webapp/.env
+
+# ISO builder output
+iso-builder/base-iso/
+iso-builder/autoinstall-iso/

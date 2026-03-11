@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+    <!-- Windows PE - Initial Setup Phase -->
+    <settings pass="windowsPE">
+        <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <SetupUILanguage>
+                <UILanguage>en-US</UILanguage>
+            </SetupUILanguage>
+            <InputLocale>en-US</InputLocale>
+            <SystemLocale>en-US</SystemLocale>
+            <UILanguage>en-US</UILanguage>
+            <UserLocale>en-US</UserLocale>
+        </component>
+        <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <!-- Disk Configuration - Single disk, GPT layout -->
+            <DiskConfiguration>
+                <Disk wcm:action="add">
+                    <DiskID>0</DiskID>
+                    <WillWipeDisk>true</WillWipeDisk>
+                    <CreatePartitions>
+                        <!-- EFI System Partition -->
+                        <CreatePartition wcm:action="add">
+                            <Order>1</Order>
+                            <Size>300</Size>
+                            <Type>EFI</Type>
+                        </CreatePartition>
+                        <!-- Microsoft Reserved Partition -->
+                        <CreatePartition wcm:action="add">
+                            <Order>2</Order>
+                            <Size>128</Size>
+                            <Type>MSR</Type>
+                        </CreatePartition>
+                        <!-- Windows Partition -->
+                        <CreatePartition wcm:action="add">
+                            <Order>3</Order>
+                            <Extend>true</Extend>
+                            <Type>Primary</Type>
+                        </CreatePartition>
+                    </CreatePartitions>
+                    <ModifyPartitions>
+                        <ModifyPartition wcm:action="add">
+                            <Order>1</Order>
+                            <PartitionID>1</PartitionID>
+                            <Format>FAT32</Format>
+                            <Label>System</Label>
+                        </ModifyPartition>
+                        <ModifyPartition wcm:action="add">
+                            <Order>2</Order>
+                            <PartitionID>2</PartitionID>
+                        </ModifyPartition>
+                        <ModifyPartition wcm:action="add">
+                            <Order>3</Order>
+                            <PartitionID>3</PartitionID>
+                            <Format>NTFS</Format>
+                            <Label>Windows</Label>
+                            <Letter>C</Letter>
+                        </ModifyPartition>
+                    </ModifyPartitions>
+                </Disk>
+            </DiskConfiguration>
+            <ImageInstall>
+                <OSImage>
+                    <InstallTo>
+                        <DiskID>0</DiskID>
+                        <PartitionID>3</PartitionID>
+                    </InstallTo>
+                    <!-- Install Standard Edition with Desktop Experience (GUI) -->
+                    <!-- Index 2 = Standard with Desktop, Index 4 = Datacenter with Desktop -->
+                    <InstallFrom>
+                        <MetaData wcm:action="add">
+                            <Key>/IMAGE/INDEX</Key>
+                            <Value>2</Value>
+                        </MetaData>
+                    </InstallFrom>
+                </OSImage>
+            </ImageInstall>
+            <UserData>
+                <AcceptEula>true</AcceptEula>
+                <FullName>Administrator</FullName>
+                <Organization>Migrate</Organization>
+                <!-- No ProductKey needed for Evaluation media -->
+                <!-- Image Index 2 = Standard Evaluation (Desktop Experience) -->
+            </UserData>
+        </component>
+    </settings>
+
+    <!-- Specialize - Machine-specific configuration -->
+    <settings pass="specialize">
+        <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <ComputerName>DC01</ComputerName>
+            <TimeZone>Pacific Standard Time</TimeZone>
+        </component>
+        <component name="Microsoft-Windows-ServerManager-SvrMgrNc" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <!-- Don't show Server Manager at logon -->
+            <DoNotOpenServerManagerAtLogon>true</DoNotOpenServerManagerAtLogon>
+        </component>
+        <component name="Microsoft-Windows-TerminalServices-LocalSessionManager" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <!-- Enable Remote Desktop -->
+            <fDenyTSConnections>false</fDenyTSConnections>
+        </component>
+        <component name="Networking-MPSSVC-Svc" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <!-- Allow Remote Desktop and WinRM through firewall -->
+            <FirewallGroups>
+                <FirewallGroup wcm:action="add" wcm:keyValue="RemoteDesktop">
+                    <Active>true</Active>
+                    <Group>Remote Desktop</Group>
+                    <Profile>all</Profile>
+                </FirewallGroup>
+                <FirewallGroup wcm:action="add" wcm:keyValue="WinRM">
+                    <Active>true</Active>
+                    <Group>Windows Remote Management</Group>
+                    <Profile>all</Profile>
+                </FirewallGroup>
+            </FirewallGroups>
+        </component>
+        <component name="Microsoft-Windows-IE-ESC" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <!-- Disable IE Enhanced Security -->
+            <IEHardenAdmin>false</IEHardenAdmin>
+            <IEHardenUser>false</IEHardenUser>
+        </component>
+    </settings>
+
+    <!-- OOBE - Out of Box Experience -->
+    <settings pass="oobeSystem">
+        <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <OOBE>
+                <HideEULAPage>true</HideEULAPage>
+                <HideLocalAccountScreen>true</HideLocalAccountScreen>
+                <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+                <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+                <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+                <NetworkLocation>Work</NetworkLocation>
+                <ProtectYourPC>3</ProtectYourPC>
+                <SkipMachineOOBE>true</SkipMachineOOBE>
+                <SkipUserOOBE>true</SkipUserOOBE>
+            </OOBE>
+            <UserAccounts>
+                <AdministratorPassword>
+                    <Value>Windows123!</Value>
+                    <PlainText>true</PlainText>
+                </AdministratorPassword>
+            </UserAccounts>
+            <AutoLogon>
+                <Enabled>true</Enabled>
+                <Username>Administrator</Username>
+                <Domain>.</Domain>
+                <Password>
+                    <Value>Windows123!</Value>
+                    <PlainText>true</PlainText>
+                </Password>
+                <LogonCount>3</LogonCount>
+            </AutoLogon>
+            <FirstLogonCommands>
+                <SynchronousCommand wcm:action="add">
+                    <Order>1</Order>
+                    <CommandLine>powershell.exe -ExecutionPolicy Bypass -File C:\Setup\Configure-ADDS.ps1</CommandLine>
+                    <Description>Configure Active Directory Domain Services</Description>
+                    <RequiresUserInput>false</RequiresUserInput>
+                </SynchronousCommand>
+            </FirstLogonCommands>
+        </component>
+    </settings>
+</unattend>

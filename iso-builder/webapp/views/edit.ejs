@@ -1,0 +1,28 @@
+<%- include('header') %>
+<h2>Edit Product #<%= product.product_id %></h2>
+
+<% if (typeof error !== 'undefined') { %>
+  <div class="alert alert-error"><%= error %></div>
+<% } %>
+
+<form action="/products/<%= product.product_id %>" method="POST" class="product-form">
+  <div class="form-group">
+    <label for="product_description">Description</label>
+    <input type="text" id="product_description" name="product_description" 
+           value="<%= product.product_description %>" 
+           required>
+  </div>
+  
+  <div class="form-group">
+    <label for="product_price">Price</label>
+    <input type="number" id="product_price" name="product_price" step="0.01" min="0"
+           value="<%= product.product_price %>" 
+           required>
+  </div>
+  
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Update Product</button>
+    <a href="/" class="btn">Cancel</a>
+  </div>
+</form>
+<%- include('footer') %>

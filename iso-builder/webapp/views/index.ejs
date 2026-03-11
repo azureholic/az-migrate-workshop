@@ -1,0 +1,39 @@
+<%- include('header') %>
+<div class="actions">
+  <a href="/create" class="btn btn-primary">Add New Product</a>
+</div>
+
+<% if (typeof error !== 'undefined') { %>
+  <div class="alert alert-error"><%= error %></div>
+<% } %>
+
+<% if (products.length === 0) { %>
+  <p class="empty-state">No products yet. Add your first product!</p>
+<% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Description</th>
+        <th>Price</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% products.forEach(product => { %>
+        <tr>
+          <td><%= product.product_id %></td>
+          <td><%= product.product_description %></td>
+          <td>$<%= parseFloat(product.product_price).toFixed(2) %></td>
+          <td class="actions-cell">
+            <a href="/edit/<%= product.product_id %>" class="btn btn-small">Edit</a>
+            <form action="/products/<%= product.product_id %>/delete" method="POST" class="inline-form">
+              <button type="submit" class="btn btn-small btn-danger" onclick="return confirm('Delete this product?')">Delete</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>
+<%- include('footer') %>
