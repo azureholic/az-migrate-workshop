@@ -2,7 +2,6 @@
 # This script orchestrates (in parallel):
 # 1. Azure Migrate infrastructure deployment (project, vault, storage, target VNet)
 # 2. Azure Migrate appliance deployment on the DC host (download + Hyper-V import)
-# Then creates a Hyper-V discovery site and prints the appliance registration key.
 
 param(
     [string]$ResourceGroupName = "rg-migrate-workshop",
@@ -11,8 +10,7 @@ param(
     [string]$VMFilesPath = "C:\dc-files",
     [string]$AzureInfraTemplate = ".\azure-infra\main.bicep",
     [string]$AzureInfraParams = ".\azure-infra\main.bicepparam",
-    [string]$Location = "swedencentral",
-    [string]$HyperVSiteName = "hyperv-site"
+    [string]$Location = "swedencentral"
 )
 
 $ErrorActionPreference = "Stop"
@@ -128,10 +126,6 @@ if ($applianceVMExists) {
 # 2. Start Azure infrastructure deployment (parallel)
 # ============================================
 Write-Host "`n[2/5] Starting Azure Migrate infrastructure deployment..." -ForegroundColor Yellow
-
-# Register Microsoft.OffAzure provider (needed for Hyper-V site later)
-Write-Host "Registering Microsoft.OffAzure resource provider..." -ForegroundColor Gray
-az provider register --namespace Microsoft.OffAzure --output none 2>&1 | Out-Null
 
 $deploymentName = "azure-migrate-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
 Write-Host "Deployment: $deploymentName" -ForegroundColor Gray
@@ -286,67 +280,6 @@ Write-Host "`nDeployed Azure resources:" -ForegroundColor Cyan
 Write-Host "  Migrate Project:  $($deployOutput.migrateProjectName.value)" -ForegroundColor Gray
 Write-Host "  Target VNet:      $($deployOutput.targetVnetName.value)" -ForegroundColor Gray
 
-# --- Create Hyper-V discovery site and generate appliance key ---
-Write-Host "`nCreating Hyper-V discovery site..." -ForegroundColor Yellow
-
-# Ensure Microsoft.OffAzure provider is registered
-$providerState = az provider show --namespace Microsoft.OffAzure --query "registrationState" --output tsv
-if ($providerState -ne "Registered") {
-    Write-Host "Waiting for Microsoft.OffAzure provider registration..." -ForegroundColor Gray
-    az provider register --namespace Microsoft.OffAzure --wait --output none
-}
-
-# Build the discovery solution ID that links the site to the migrate project
-$discoverySolutionId = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Migrate/migrateProjects/$MigrateProjectName/solutions/Servers-Discovery-ServerDiscovery"
-
-# Create the Hyper-V site via REST API
-$siteUri = "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.OffAzure/HyperVSites/${HyperVSiteName}?api-version=2023-06-06"
-
-$siteBody = @{
-    location   = $Location
-    properties = @{
-        discoverySolutionId = $discoverySolutionId
-    }
-} | ConvertTo-Json -Depth 5 -Compress
-
-# Write body to temp file to avoid PowerShell/CLI quoting issues
-$tempBodyFile = [System.IO.Path]::GetTempFileName()
-[System.IO.File]::WriteAllText($tempBodyFile, $siteBody)
-
-$siteCreated = $false
-try {
-    az rest --method put --uri $siteUri --body "@$tempBodyFile" --output none 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "Hyper-V site '$HyperVSiteName' created and linked to project" -ForegroundColor Green
-        $siteCreated = $true
-    }
-} catch {
-    Write-Host "Warning: Could not create site linked to project, trying unlinked..." -ForegroundColor Yellow
-}
-Remove-Item $tempBodyFile -Force -ErrorAction SilentlyContinue
-
-# Fallback: create unlinked site if linked creation failed
-if (-not $siteCreated) {
-    $siteBodySimple = @{
-        location   = $Location
-        properties = @{}
-    } | ConvertTo-Json -Compress
-
-    $tempBodyFile = [System.IO.Path]::GetTempFileName()
-    [System.IO.File]::WriteAllText($tempBodyFile, $siteBodySimple)
-
-    try {
-        az rest --method put --uri $siteUri --body "@$tempBodyFile" --output none 2>$null
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "Hyper-V site '$HyperVSiteName' created (unlinked)" -ForegroundColor Green
-            $siteCreated = $true
-        }
-    } catch {
-        Write-Host "ERROR: Failed to create Hyper-V site: $_" -ForegroundColor Red
-    }
-    Remove-Item $tempBodyFile -Force -ErrorAction SilentlyContinue
-}
-
 # ============================================
 # Summary
 # ============================================
@@ -354,7 +287,6 @@ Write-Host "`n=== Azure Migrate Deployment Complete ===" -ForegroundColor Yellow
 
 Write-Host "`nAzure Resources:" -ForegroundColor Yellow
 Write-Host "  - Migrate Project:  $($deployOutput.migrateProjectName.value)" -ForegroundColor Cyan
-Write-Host "  - Hyper-V Site:     $HyperVSiteName" -ForegroundColor Cyan
 Write-Host "  - Target VNet:      $($deployOutput.targetVnetName.value)" -ForegroundColor Cyan
 
 Write-Host "`nAppliance VM on DC host:" -ForegroundColor Yellow
