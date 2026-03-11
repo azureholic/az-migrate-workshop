@@ -1,0 +1,13 @@
+[Unit]
+Description=Setup webapp database and start PM2
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/webapp/setup-db.sh
+RemainAfterExit=no
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

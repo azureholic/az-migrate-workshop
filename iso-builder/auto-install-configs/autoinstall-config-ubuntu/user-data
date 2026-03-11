@@ -1,0 +1,31 @@
+#cloud-config
+autoinstall:
+  version: 1
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  identity:
+    hostname: ubuntu-server
+    username: ubuntu
+    password: '$6$OOtc7wccF0hs8EWz$LNov88z3z/aTSZAJSCo2xa7dt8hMlVnRF5GSGZ/Mijt5ROPyvI8o7W44Np/dxUTok8Nqnm8q2a/Tf/hgy.FT21'
+  ssh:
+    install-server: true
+    allow-pw: true
+  network:
+    ethernets:
+      eth0:
+        dhcp4: true
+    version: 2
+  storage:
+    layout:
+      name: lvm
+  packages:
+    - openssh-server
+    - curl
+    - wget
+    - linux-cloud-tools-virtual
+    - linux-tools-virtual
+  late-commands:
+    - curtin in-target --target=/target -- systemctl enable ssh
+  user-data:
+    disable_root: true
