@@ -272,6 +272,20 @@ try {
     Enable-VMIntegrationService -VMName $VMName -Name "Guest Service Interface" -ErrorAction SilentlyContinue
     Write-Host "Guest services enabled" -ForegroundColor Gray
 
+    # Add DHCP reservation BEFORE starting VM so first DHCP response has the correct IP
+    Write-Host "`nConfiguring DHCP reservation for static IP..." -ForegroundColor Cyan
+    $vmNetAdapter = Get-VMNetworkAdapter -VMName $VMName
+    $macAddress = $vmNetAdapter.MacAddress -replace '(..)(..)(..)(..)(..)(..)','$1-$2-$3-$4-$5-$6'
+    
+    # Remove existing reservation if present
+    Get-DhcpServerv4Reservation -ScopeId 192.168.100.0 -ErrorAction SilentlyContinue | 
+        Where-Object { $_.IPAddress -eq $StaticIP -or $_.ClientId -eq $macAddress } |
+        Remove-DhcpServerv4Reservation -ErrorAction SilentlyContinue
+    
+    # Add new reservation
+    Add-DhcpServerv4Reservation -ScopeId 192.168.100.0 -IPAddress $StaticIP -ClientId $macAddress -Name $VMName -Description "Azure Migrate Appliance"
+    Write-Host "DHCP reservation added: $VMName -> $StaticIP (MAC: $macAddress)" -ForegroundColor Green
+
     # Start the VM
     Write-Host "`nStarting VM..." -ForegroundColor Cyan
     Start-VM -Name $VMName
@@ -292,25 +306,6 @@ try {
 # Summary
 # ============================================
 Write-Host "`n=== VM Import Complete ===" -ForegroundColor Yellow
-
-# Add DHCP reservation for static IP
-Write-Host "`nConfiguring DHCP reservation for static IP..." -ForegroundColor Cyan
-try {
-    $vmNetAdapter = Get-VMNetworkAdapter -VMName $VMName
-    $macAddress = $vmNetAdapter.MacAddress -replace '(..)(..)(..)(..)(..)(..)','$1-$2-$3-$4-$5-$6'
-    
-    # Remove existing reservation if present
-    Get-DhcpServerv4Reservation -ScopeId 192.168.100.0 -ErrorAction SilentlyContinue | 
-        Where-Object { $_.IPAddress -eq $StaticIP -or $_.ClientId -eq $macAddress } |
-        Remove-DhcpServerv4Reservation -ErrorAction SilentlyContinue
-    
-    # Add new reservation
-    Add-DhcpServerv4Reservation -ScopeId 192.168.100.0 -IPAddress $StaticIP -ClientId $macAddress -Name $VMName -Description "Azure Migrate Appliance"
-    Write-Host "DHCP reservation added: $VMName -> $StaticIP (MAC: $macAddress)" -ForegroundColor Green
-} catch {
-    Write-Host "WARNING: Could not add DHCP reservation: $_" -ForegroundColor Yellow
-    Write-Host "VM will use dynamic IP from DHCP" -ForegroundColor Yellow
-}
 
 $vm = Get-VM -Name $VMName
 $vmLocation = $vm.ConfigurationLocation
