@@ -49,7 +49,7 @@ The `tunnel.ps1` script creates a Bastion tunnel to access VMs via RDP:
 # Connect to Azure Migrate appliance (default) → localhost:33389
 .\tunnel.ps1
 
-# Connect to DC VM directly → localhost:3389
+# Connect to DC VM directly → localhost:33390
 .\tunnel.ps1 -Target DC
 ```
 
@@ -60,7 +60,7 @@ The `tunnel.ps1` script creates a Bastion tunnel to access VMs via RDP:
    .\tunnel.ps1 -Target DC
    ```
 2. Open **Remote Desktop Connection** (mstsc)
-3. Connect to `localhost:3389`
+3. Connect to `localhost:33390`
 4. Login with credentials:
    - **Username:** `azureuser`
    - **Password:** `$uper$ecretP@ssw0rd`

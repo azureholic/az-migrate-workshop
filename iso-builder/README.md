@@ -106,4 +106,4 @@ Same base as above, plus:
 
 ## Hyper-V VM Settings
 
-Ubuntu ISOs are designed for **Generation 2** Hyper-V VMs with **Secure Boot disabled**. Windows ISO supports **Secure Boot**
+Ubuntu ISOs are designed for **Generation 1** Hyper-V VMs with **Secure Boot disabled**. Windows ISO supports **Secure Boot**
