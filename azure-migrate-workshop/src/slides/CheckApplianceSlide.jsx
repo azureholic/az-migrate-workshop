@@ -10,7 +10,7 @@ export default function CheckApplianceSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 6</p>
+          <p className={styles.eyebrow}>Step 5</p>
           <h2>Check <span className={styles.highlight}>Appliance</span></h2>
           <p className={styles.subtitle}>
             You can now check in the Azure Portal if the appliance is present

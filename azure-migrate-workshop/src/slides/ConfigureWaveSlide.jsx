@@ -10,7 +10,7 @@ export default function ConfigureWaveSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 23</p>
+          <p className={styles.eyebrow}>Step 22</p>
           <h2>Configure <span className={styles.highlight}>Wave</span></h2>
           <p className={styles.subtitle}>
             Set up replication for the Hyper-V host

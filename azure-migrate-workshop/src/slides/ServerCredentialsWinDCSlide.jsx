@@ -10,7 +10,7 @@ export default function ServerCredentialsWinDCSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 10</p>
+          <p className={styles.eyebrow}>Step 9</p>
           <h2>Server Credentials — <span className={styles.highlight}>Windows DC</span></h2>
           <p className={styles.subtitle}>
             Add the Windows domain controller credentials for guest discovery

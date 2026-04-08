@@ -10,7 +10,7 @@ export default function FinalizeRegistrationSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 26</p>
+          <p className={styles.eyebrow}>Step 25</p>
           <h2>Finalize <span className={styles.highlight}>Registration</span></h2>
           <p className={styles.subtitle}>
             Confirm the registered Hyper-V hosts and proceed

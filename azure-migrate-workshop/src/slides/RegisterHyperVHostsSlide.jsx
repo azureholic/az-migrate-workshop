@@ -10,7 +10,7 @@ export default function RegisterHyperVHostsSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 25</p>
+          <p className={styles.eyebrow}>Step 24</p>
           <h2>Register <span className={styles.highlight}>Hyper-V Hosts</span></h2>
           <p className={styles.subtitle}>
             Install the Azure Site Recovery Provider on the VM-DC

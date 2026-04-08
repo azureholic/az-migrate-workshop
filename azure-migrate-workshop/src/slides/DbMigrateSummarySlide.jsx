@@ -10,7 +10,7 @@ export default function DbMigrateSummarySlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 35</p>
+          <p className={styles.eyebrow}>Step 34</p>
           <h2>Review &amp; <span className={styles.highlight}>Migrate</span></h2>
           <p className={styles.subtitle}>
             Verify the summary and start the migration

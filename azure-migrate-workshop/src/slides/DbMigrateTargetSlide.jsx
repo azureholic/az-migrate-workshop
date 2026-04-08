@@ -10,7 +10,7 @@ export default function DbMigrateTargetSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 33</p>
+          <p className={styles.eyebrow}>Step 32</p>
           <h2>Target <span className={styles.highlight}>Server</span></h2>
           <p className={styles.subtitle}>
             Verify the Azure Database for PostgreSQL target

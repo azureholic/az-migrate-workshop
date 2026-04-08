@@ -10,7 +10,7 @@ export default function BusinessCaseSettingsSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 17</p>
+          <p className={styles.eyebrow}>Step 16</p>
           <h2>Business Case <span className={styles.highlight}>Settings</span></h2>
           <p className={styles.subtitle}>
             Configure the target settings and generate the business case

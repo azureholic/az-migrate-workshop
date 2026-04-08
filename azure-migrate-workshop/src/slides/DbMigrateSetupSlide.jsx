@@ -10,7 +10,7 @@ export default function DbMigrateSetupSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 30</p>
+          <p className={styles.eyebrow}>Step 29</p>
           <h2>Migration <span className={styles.highlight}>Setup</span></h2>
           <p className={styles.subtitle}>
             Configure the PostgreSQL migration wizard

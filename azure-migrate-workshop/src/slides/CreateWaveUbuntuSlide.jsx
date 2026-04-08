@@ -10,7 +10,7 @@ export default function CreateWaveUbuntuSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 21</p>
+          <p className={styles.eyebrow}>Step 20</p>
           <h2>Create <span className={styles.highlight}>Wave</span> — Ubuntu</h2>
           <p className={styles.subtitle}>
             Group the UbuntuVM into a migration wave

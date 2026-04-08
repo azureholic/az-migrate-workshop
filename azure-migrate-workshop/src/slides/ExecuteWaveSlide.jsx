@@ -10,7 +10,7 @@ export default function ExecuteWaveSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 27</p>
+          <p className={styles.eyebrow}>Step 26</p>
           <h2>Execute <span className={styles.highlight}>Wave</span></h2>
           <p className={styles.subtitle}>
             Run the migration for the Ubuntu VM

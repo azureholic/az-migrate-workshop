@@ -10,7 +10,7 @@ export default function AssessmentLiftShiftSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 19</p>
+          <p className={styles.eyebrow}>Step 18</p>
           <h2>Create Assessment — <span className={styles.highlight}>Lift &amp; Shift</span></h2>
           <p className={styles.subtitle}>
             Create a dedicated assessment for the UbuntuVM lift-and-shift migration

@@ -10,7 +10,7 @@ export default function BusinessCaseExploreSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 18</p>
+          <p className={styles.eyebrow}>Step 17</p>
           <h2>Explore <span className={styles.highlight}>Business Case</span></h2>
           <p className={styles.subtitle}>
             Review the outcome of your business case assessment

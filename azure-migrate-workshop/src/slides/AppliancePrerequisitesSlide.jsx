@@ -10,7 +10,7 @@ export default function AppliancePrerequisitesSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 5</p>
+          <p className={styles.eyebrow}>Step 4</p>
           <h2>Configure Appliance: <span className={styles.highlight}>Update &amp; Register</span></h2>
           <p className={styles.subtitle}>
             Paste the project key, let the appliance update, and sign in to Azure

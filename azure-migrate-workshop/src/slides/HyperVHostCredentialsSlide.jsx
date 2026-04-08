@@ -10,7 +10,7 @@ export default function HyperVHostCredentialsSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 7</p>
+          <p className={styles.eyebrow}>Step 6</p>
           <h2>HyperV Host <span className={styles.highlight}>Credentials</span></h2>
           <p className={styles.subtitle}>
             Add the Hyper-V host credentials so the appliance can discover your environment

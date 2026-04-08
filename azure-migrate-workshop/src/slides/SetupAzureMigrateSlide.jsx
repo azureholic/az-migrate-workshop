@@ -10,7 +10,7 @@ export default function SetupAzureMigrateSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 24</p>
+          <p className={styles.eyebrow}>Step 23</p>
           <h2>Setup <span className={styles.highlight}>Azure Migrate</span></h2>
           <p className={styles.subtitle}>
             Follow the wave guidance to set up the migration

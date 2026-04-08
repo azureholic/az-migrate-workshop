@@ -10,7 +10,7 @@ export default function ConnectApplianceSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 2</p>
+          <p className={styles.eyebrow}>Step 1</p>
           <h2>Prepare the <span className={styles.highlight}>Appliance</span></h2>
           <p className={styles.subtitle}>
             Tunnel into the DC VM and access the Azure Migrate appliance via Hyper-V

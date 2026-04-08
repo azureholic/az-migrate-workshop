@@ -10,7 +10,7 @@ export default function HyperVDiscoverySourceSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 8</p>
+          <p className={styles.eyebrow}>Step 7</p>
           <h2>Hyper-V <span className={styles.highlight}>Discovery Source</span></h2>
           <p className={styles.subtitle}>
             Add the Hyper-V host as a discovery source for the appliance

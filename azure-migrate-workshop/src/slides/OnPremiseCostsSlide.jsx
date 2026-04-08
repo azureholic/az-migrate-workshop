@@ -10,7 +10,7 @@ export default function OnPremiseCostsSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 13</p>
+          <p className={styles.eyebrow}>Step 12</p>
           <h2>On-Premise <span className={styles.highlight}>Costs</span></h2>
           <p className={styles.subtitle}>
             Review and adjust the on-premise cost assumptions in the migrate project

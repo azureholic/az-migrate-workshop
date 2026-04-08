@@ -1,9 +1,8 @@
 import CoverSlide from './src/slides/CoverSlide.jsx'
-import EnvironmentSetupSlide from './src/slides/EnvironmentSetupSlide.jsx'
 import ConnectApplianceSlide from './src/slides/ConnectApplianceSlide.jsx'
 import ConfigureApplianceSlide from './src/slides/ConfigureApplianceSlide.jsx'
+import ConnectApplianceRdpSlide from './src/slides/ConnectApplianceRdpSlide.jsx'
 import HyperVHostCredentialsSlide from './src/slides/HyperVHostCredentialsSlide.jsx'
-import WindowsUpdateSlide from './src/slides/WindowsUpdateSlide.jsx'
 import AppliancePrerequisitesSlide from './src/slides/AppliancePrerequisitesSlide.jsx'
 import CheckApplianceSlide from './src/slides/CheckApplianceSlide.jsx'
 import HyperVDiscoverySourceSlide from './src/slides/HyperVDiscoverySourceSlide.jsx'
@@ -36,7 +35,7 @@ import DbMigrateSourceSlide from './src/slides/DbMigrateSourceSlide.jsx'
 import DbMigrateTargetSlide from './src/slides/DbMigrateTargetSlide.jsx'
 import DbMigrateDatabasesSlide from './src/slides/DbMigrateDatabasesSlide.jsx'
 import DbMigrateSummarySlide from './src/slides/DbMigrateSummarySlide.jsx'
-import { GenericThankYouSlide as ThankYouSlide } from '@deckio/deck-engine'
+import ThankYouSlide from './src/slides/ThankYouSlide.jsx'
 
 export default {
   id: 'azure-migrate-workshop',
@@ -55,10 +54,9 @@ export default {
   order: 1,
   slides: [
     CoverSlide,
-    EnvironmentSetupSlide,
     ConnectApplianceSlide,
     ConfigureApplianceSlide,
-    WindowsUpdateSlide,
+    ConnectApplianceRdpSlide,
     AppliancePrerequisitesSlide,
     CheckApplianceSlide,
     HyperVHostCredentialsSlide,

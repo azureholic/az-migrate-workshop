@@ -10,7 +10,7 @@ export default function ReviewAssessmentLiftShiftSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 20</p>
+          <p className={styles.eyebrow}>Step 19</p>
           <h2>Review Assessment — <span className={styles.highlight}>Lift &amp; Shift</span></h2>
           <p className={styles.subtitle}>
             Explore the assessment for the UbuntuVM and create a migration wave

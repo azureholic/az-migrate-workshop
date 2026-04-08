@@ -10,7 +10,7 @@ export default function DbMigrateDatabasesSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 34</p>
+          <p className={styles.eyebrow}>Step 33</p>
           <h2>Select <span className={styles.highlight}>Databases</span></h2>
           <p className={styles.subtitle}>
             Choose which databases to validate and migrate

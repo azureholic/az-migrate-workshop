@@ -10,7 +10,7 @@ export default function DbMigrateRuntimeSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 31</p>
+          <p className={styles.eyebrow}>Step 30</p>
           <h2>Runtime <span className={styles.highlight}>Server</span></h2>
           <p className={styles.subtitle}>
             Configure the runtime server that performs the migration

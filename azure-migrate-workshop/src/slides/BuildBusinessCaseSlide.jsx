@@ -10,7 +10,7 @@ export default function BuildBusinessCaseSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 15</p>
+          <p className={styles.eyebrow}>Step 14</p>
           <h2>Build <span className={styles.highlight}>Business Case</span></h2>
           <p className={styles.subtitle}>
             Start building your business case from the Azure Migrate hub

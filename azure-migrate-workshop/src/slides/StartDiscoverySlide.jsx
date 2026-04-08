@@ -10,7 +10,7 @@ export default function StartDiscoverySlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 12</p>
+          <p className={styles.eyebrow}>Step 11</p>
           <h2>Start <span className={styles.highlight}>Discovery</span></h2>
           <p className={styles.subtitle}>
             Review your credentials list and kick off the discovery process

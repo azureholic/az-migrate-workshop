@@ -10,7 +10,7 @@ export default function SelectWorkloadsSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 16</p>
+          <p className={styles.eyebrow}>Step 15</p>
           <h2>Select <span className={styles.highlight}>Workloads</span></h2>
           <p className={styles.subtitle}>
             Choose which discovered workloads to include in the business case

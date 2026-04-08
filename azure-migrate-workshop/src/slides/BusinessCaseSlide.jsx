@@ -10,7 +10,7 @@ export default function BusinessCaseSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 14</p>
+          <p className={styles.eyebrow}>Step 13</p>
           <h2>Review Inventory &amp; Build <span className={styles.highlight}>Business Case</span></h2>
           <p className={styles.subtitle}>
             Review your discovered inventory in the Azure Portal and generate a business case before migrating

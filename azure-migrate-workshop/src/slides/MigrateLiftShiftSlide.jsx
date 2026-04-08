@@ -10,7 +10,7 @@ export default function MigrateLiftShiftSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 29</p>
+          <p className={styles.eyebrow}>Step 28</p>
           <h2>Migrate — <span className={styles.highlight}>Lift &amp; Shift</span></h2>
           <p className={styles.subtitle}>
             Test and complete the migration using Azure Site Recovery

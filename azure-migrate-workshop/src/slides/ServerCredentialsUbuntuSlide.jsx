@@ -10,7 +10,7 @@ export default function ServerCredentialsUbuntuSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 9</p>
+          <p className={styles.eyebrow}>Step 8</p>
           <h2>Server Credentials — <span className={styles.highlight}>Ubuntu</span></h2>
           <p className={styles.subtitle}>
             Provide server credentials to perform guest discovery of installed software, file shares, dependencies and workloads

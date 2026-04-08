@@ -10,7 +10,7 @@ export default function ReplicationSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 28</p>
+          <p className={styles.eyebrow}>Step 27</p>
           <h2>Disk <span className={styles.highlight}>Replication</span></h2>
           <p className={styles.subtitle}>
             Wait for the Hyper-V disk replication to Azure

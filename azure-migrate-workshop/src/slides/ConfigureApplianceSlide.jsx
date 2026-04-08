@@ -10,7 +10,7 @@ export default function ConfigureApplianceSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 3</p>
+          <p className={styles.eyebrow}>Step 2</p>
           <h2>Configure Appliance: <span className={styles.highlight}>Setup Prerequisites</span></h2>
           <p className={styles.subtitle}>
             Generate the appliance key in the Azure Portal before configuring the appliance

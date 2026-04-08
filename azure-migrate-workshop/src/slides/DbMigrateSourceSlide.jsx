@@ -10,7 +10,7 @@ export default function DbMigrateSourceSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 32</p>
+          <p className={styles.eyebrow}>Step 31</p>
           <h2>Source <span className={styles.highlight}>Server</span></h2>
           <p className={styles.subtitle}>
             Connect to the on-premises PostgreSQL source

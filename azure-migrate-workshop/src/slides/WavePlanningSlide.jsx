@@ -10,7 +10,7 @@ export default function WavePlanningSlide({ index, project }) {
 
       <div className={`${styles.body} content-frame content-gutter`}>
         <div className={styles.header}>
-          <p className={styles.eyebrow}>Step 22</p>
+          <p className={styles.eyebrow}>Step 21</p>
           <h2>Wave <span className={styles.highlight}>Planning</span></h2>
           <p className={styles.subtitle}>
             Configure the migration wave for the Ubuntu workload
