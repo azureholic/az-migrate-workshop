@@ -40,6 +40,10 @@ ufw allow 5432/tcp 2>/dev/null || true
 sudo -u postgres psql -c "CREATE USER webadmin WITH PASSWORD 'webadmin123';" 2>/dev/null || true
 sudo -u postgres psql -c "CREATE DATABASE webapp OWNER webadmin;" 2>/dev/null || true
 
+# Grant migration-required roles to webadmin
+sudo -u postgres psql -c "GRANT pg_read_all_data TO webadmin;" 2>/dev/null || true
+sudo -u postgres psql -c "GRANT pg_read_all_settings TO webadmin;" 2>/dev/null || true
+
 # Create table and grants (idempotent)
 sudo -u postgres psql -d webapp -c "CREATE TABLE IF NOT EXISTS products (product_id SERIAL PRIMARY KEY, product_description TEXT NOT NULL, product_price NUMERIC(10,2) NOT NULL);"
 sudo -u postgres psql -d webapp -c "GRANT ALL PRIVILEGES ON TABLE products TO webadmin;"

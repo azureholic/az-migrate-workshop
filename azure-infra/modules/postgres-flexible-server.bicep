@@ -59,6 +59,16 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' =
   }
 }
 
+// Allow Azure services to connect (needed for migration from runtime server)
+resource allowAzureServices 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-08-01' = if (empty(delegatedSubnetResourceId)) {
+  parent: postgresServer
+  name: 'AllowAllAzureServicesAndResourcesWithinAzureIps'
+  properties: {
+    startIpAddress: '0.0.0.0'
+    endIpAddress: '255.255.255.255'
+  }
+}
+
 output serverName string = postgresServer.name
 output serverFqdn string = postgresServer.properties.fullyQualifiedDomainName
 output serverId string = postgresServer.id

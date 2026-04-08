@@ -17,6 +17,7 @@ import BuildBusinessCaseSlide from './src/slides/BuildBusinessCaseSlide.jsx'
 import SelectWorkloadsSlide from './src/slides/SelectWorkloadsSlide.jsx'
 import BusinessCaseSettingsSlide from './src/slides/BusinessCaseSettingsSlide.jsx'
 import BusinessCaseExploreSlide from './src/slides/BusinessCaseExploreSlide.jsx'
+import LiftShiftChapterSlide from './src/slides/LiftShiftChapterSlide.jsx'
 import AssessmentLiftShiftSlide from './src/slides/AssessmentLiftShiftSlide.jsx'
 import ReviewAssessmentLiftShiftSlide from './src/slides/ReviewAssessmentLiftShiftSlide.jsx'
 import CreateWaveUbuntuSlide from './src/slides/CreateWaveUbuntuSlide.jsx'
@@ -28,6 +29,13 @@ import FinalizeRegistrationSlide from './src/slides/FinalizeRegistrationSlide.js
 import ExecuteWaveSlide from './src/slides/ExecuteWaveSlide.jsx'
 import ReplicationSlide from './src/slides/ReplicationSlide.jsx'
 import MigrateLiftShiftSlide from './src/slides/MigrateLiftShiftSlide.jsx'
+import DatabaseMigrationSlide from './src/slides/DatabaseMigrationSlide.jsx'
+import DbMigrateSetupSlide from './src/slides/DbMigrateSetupSlide.jsx'
+import DbMigrateRuntimeSlide from './src/slides/DbMigrateRuntimeSlide.jsx'
+import DbMigrateSourceSlide from './src/slides/DbMigrateSourceSlide.jsx'
+import DbMigrateTargetSlide from './src/slides/DbMigrateTargetSlide.jsx'
+import DbMigrateDatabasesSlide from './src/slides/DbMigrateDatabasesSlide.jsx'
+import DbMigrateSummarySlide from './src/slides/DbMigrateSummarySlide.jsx'
 import { GenericThankYouSlide as ThankYouSlide } from '@deckio/deck-engine'
 
 export default {
@@ -65,6 +73,7 @@ export default {
     SelectWorkloadsSlide,
     BusinessCaseSettingsSlide,
     BusinessCaseExploreSlide,
+    LiftShiftChapterSlide,
     AssessmentLiftShiftSlide,
     ReviewAssessmentLiftShiftSlide,
     CreateWaveUbuntuSlide,
@@ -76,6 +85,13 @@ export default {
     ExecuteWaveSlide,
     ReplicationSlide,
     MigrateLiftShiftSlide,
+    DatabaseMigrationSlide,
+    DbMigrateSetupSlide,
+    DbMigrateRuntimeSlide,
+    DbMigrateSourceSlide,
+    DbMigrateTargetSlide,
+    DbMigrateDatabasesSlide,
+    DbMigrateSummarySlide,
     ThankYouSlide,
   ],
 }
