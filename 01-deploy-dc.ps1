@@ -2,13 +2,19 @@
 # This script deploys the DC infrastructure including VNet, Storage, VM, and Bastion
 
 param(
-    [string]$ResourceGroupName = "rg-migrate-workshop",
-    [string]$Location = "swedencentral",
+    [string]$ResourceGroupName,
+    [string]$Location,
     [string]$TemplateFile = ".\dc-infra\main.bicep",
     [string]$ParametersFile = ".\dc-infra\main.bicepparam"
 )
 
 $ErrorActionPreference = "Stop"
+
+# Read config from dc-infra\main.bicepparam (single source of truth)
+$bicepParamFile = Join-Path $PSScriptRoot "dc-infra\main.bicepparam"
+$bicepContent = Get-Content $bicepParamFile -Raw
+if (-not $ResourceGroupName) { $ResourceGroupName = [regex]::Match($bicepContent, "param resourceGroupName = '([^']+)'").Groups[1].Value }
+if (-not $Location) { $Location = [regex]::Match($bicepContent, "param location = '([^']+)'").Groups[1].Value }
 
 Write-Host "`n=== Azure Migration Workshop - DC Infrastructure Deployment ===" -ForegroundColor Yellow
 Write-Host "Resource Group: $ResourceGroupName" -ForegroundColor Cyan

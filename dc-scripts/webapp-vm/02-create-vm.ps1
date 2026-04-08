@@ -10,7 +10,8 @@ param(
     [int64]$VHDSize = 50GB,
     [int64]$MemoryStartupBytes = 4GB,
     [int]$ProcessorCount = 2,
-    [string]$SwitchName = "NAT-Switch"
+    [string]$SwitchName = "NAT-Switch",
+    [string]$StaticIP = "192.168.100.30"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,7 +24,7 @@ Write-Host "VM Path: $VMPath`n" -ForegroundColor Cyan
 # ============================================
 # 1. Verify Prerequisites
 # ============================================
-Write-Host "[1/6] Verifying prerequisites..." -ForegroundColor Yellow
+Write-Host "[1/7] Verifying prerequisites..." -ForegroundColor Yellow
 
 # Check if Hyper-V is enabled
 try {
@@ -50,7 +51,7 @@ Write-Host "Ubuntu Webapp ISO found: $IsoPath" -ForegroundColor Green
 # ============================================
 # 2. Create VM Directory
 # ============================================
-Write-Host "`n[2/6] Creating VM directory..." -ForegroundColor Yellow
+Write-Host "`n[2/7] Creating VM directory..." -ForegroundColor Yellow
 
 $vmDir = Split-Path $VHDPath -Parent
 if (Test-Path $vmDir) {
@@ -63,7 +64,7 @@ Write-Host "Created directory: $vmDir" -ForegroundColor Green
 # ============================================
 # 3. Verify NAT Virtual Switch
 # ============================================
-Write-Host "`n[3/6] Verifying NAT virtual switch..." -ForegroundColor Yellow
+Write-Host "`n[3/7] Verifying NAT virtual switch..." -ForegroundColor Yellow
 
 # NAT switch should be created by 02-prep-dc.ps1
 $existingSwitch = Get-VMSwitch -Name $SwitchName -ErrorAction SilentlyContinue
@@ -80,7 +81,7 @@ if ($existingSwitch) {
 # ============================================
 # 4. Create VM
 # ============================================
-Write-Host "`n[4/6] Creating virtual machine..." -ForegroundColor Yellow
+Write-Host "`n[4/7] Creating virtual machine..." -ForegroundColor Yellow
 
 # Check if VM already exists
 $existingVM = Get-VM -Name $VMName -ErrorAction SilentlyContinue
@@ -108,7 +109,7 @@ Write-Host "VM created successfully" -ForegroundColor Green
 # ============================================
 # 5. Configure VM Settings
 # ============================================
-Write-Host "`n[5/6] Configuring VM settings..." -ForegroundColor Yellow
+Write-Host "`n[5/7] Configuring VM settings..." -ForegroundColor Yellow
 
 # Set processor count
 Set-VMProcessor -VMName $VMName -Count $ProcessorCount
@@ -133,7 +134,7 @@ Write-Host "Guest services enabled" -ForegroundColor Gray
 # ============================================
 # 6. Start VM
 # ============================================
-Write-Host "`n[6/6] Starting VM..." -ForegroundColor Yellow
+Write-Host "`n[6/7] Starting VM..." -ForegroundColor Yellow
 
 Start-VM -Name $VMName
 Write-Host "VM started successfully!" -ForegroundColor Green
@@ -143,6 +144,27 @@ Start-Sleep -Seconds 3
 $vm = Get-VM -Name $VMName
 Write-Host "`nVM Status: $($vm.State)" -ForegroundColor Cyan
 Write-Host "Uptime: $($vm.Uptime)" -ForegroundColor Gray
+
+# ============================================
+# 7. Configure DHCP Reservation
+# ============================================
+Write-Host "`n[7/7] Configuring DHCP reservation for static IP..." -ForegroundColor Yellow
+try {
+    $vmNetAdapter = Get-VMNetworkAdapter -VMName $VMName
+    $macAddress = $vmNetAdapter.MacAddress -replace '(..)(..)(..)(..)(..)(..)','$1-$2-$3-$4-$5-$6'
+    
+    # Remove existing reservation if present
+    Get-DhcpServerv4Reservation -ScopeId 192.168.100.0 -ErrorAction SilentlyContinue | 
+        Where-Object { $_.IPAddress -eq $StaticIP -or $_.ClientId -eq $macAddress } |
+        Remove-DhcpServerv4Reservation -ErrorAction SilentlyContinue
+    
+    # Add new reservation
+    Add-DhcpServerv4Reservation -ScopeId 192.168.100.0 -IPAddress $StaticIP -ClientId $macAddress -Name $VMName -Description "Ubuntu Webapp VM with PostgreSQL"
+    Write-Host "DHCP reservation added: $VMName -> $StaticIP (MAC: $macAddress)" -ForegroundColor Green
+} catch {
+    Write-Host "WARNING: Could not add DHCP reservation: $_" -ForegroundColor Yellow
+    Write-Host "VM will use dynamic IP from DHCP" -ForegroundColor Yellow
+}
 
 # ============================================
 # Summary
@@ -156,6 +178,7 @@ Write-Host "  CPUs: $ProcessorCount" -ForegroundColor Gray
 Write-Host "  Memory: $([math]::Round($MemoryStartupBytes/1GB))GB" -ForegroundColor Gray
 Write-Host "  VHD: $VHDPath ($([math]::Round($VHDSize/1GB))GB)" -ForegroundColor Gray
 Write-Host "  Switch: $SwitchName" -ForegroundColor Gray
+Write-Host "  Static IP: $StaticIP (via DHCP reservation)" -ForegroundColor Gray
 Write-Host "  ISO: $IsoPath" -ForegroundColor Gray
 
 Write-Host "`nNext Steps:" -ForegroundColor Yellow

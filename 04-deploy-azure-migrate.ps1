@@ -1,19 +1,25 @@
 # Azure Migration Workshop - Deploy Azure Migrate
 # This script orchestrates (in parallel):
-# 1. Azure Migrate infrastructure deployment (project, vault, storage, target VNet)
+# 1. Azure Migrate infrastructure deployment (project, storage, target VNet)
 # 2. Azure Migrate appliance deployment on the DC host (download + Hyper-V import)
 
 param(
-    [string]$ResourceGroupName = "rg-migrate-workshop",
+    [string]$ResourceGroupName,
     [string]$VMName = "vm-dc",
     [string]$ScriptsPath = ".\dc-scripts\az-migrate-vm",
     [string]$VMFilesPath = "C:\dc-files",
     [string]$AzureInfraTemplate = ".\azure-infra\main.bicep",
     [string]$AzureInfraParams = ".\azure-infra\main.bicepparam",
-    [string]$Location = "swedencentral"
+    [string]$Location
 )
 
 $ErrorActionPreference = "Stop"
+
+# Read config from dc-infra\main.bicepparam (single source of truth)
+$bicepParamFile = Join-Path $PSScriptRoot "dc-infra\main.bicepparam"
+$bicepContent = Get-Content $bicepParamFile -Raw
+if (-not $ResourceGroupName) { $ResourceGroupName = [regex]::Match($bicepContent, "param resourceGroupName = '([^']+)'").Groups[1].Value }
+if (-not $Location) { $Location = [regex]::Match($bicepContent, "param location = '([^']+)'").Groups[1].Value }
 
 Write-Host "`n=== Azure Migration Workshop - Deploy Azure Migrate ===" -ForegroundColor Yellow
 Write-Host "Resource Group: $ResourceGroupName" -ForegroundColor Cyan
@@ -131,11 +137,13 @@ $deploymentName = "azure-migrate-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
 Write-Host "Deployment: $deploymentName" -ForegroundColor Gray
 Write-Host "Template: $AzureInfraTemplate" -ForegroundColor Gray
 
-az deployment group create `
-    --resource-group $ResourceGroupName `
+az deployment sub create `
+    --location $Location `
     --name $deploymentName `
     --template-file $AzureInfraTemplate `
     --parameters $AzureInfraParams `
+        location=$Location `
+        dcResourceGroupName=$ResourceGroupName `
     --no-wait `
     --output none
 
@@ -180,22 +188,19 @@ if ($applianceVMExists) {
 Write-Host "`n[5/5] Waiting for Azure infrastructure deployment to complete..." -ForegroundColor Yellow
 
 # Wait for Bicep deployment to finish
-az deployment group wait `
-    --resource-group $ResourceGroupName `
+az deployment sub wait `
     --name $deploymentName `
     --created `
     --timeout 1800 2>&1 | Out-Null
 
-$deployState = az deployment group show `
-    --resource-group $ResourceGroupName `
+$deployState = az deployment sub show `
     --name $deploymentName `
     --query "properties.provisioningState" `
     --output tsv
 
 if ($deployState -ne "Succeeded") {
     Write-Host "ERROR: Azure infrastructure deployment failed (state: $deployState)" -ForegroundColor Red
-    az deployment group show `
-        --resource-group $ResourceGroupName `
+    az deployment sub show `
         --name $deploymentName `
         --query "properties.error" --output json
     exit 1
@@ -204,8 +209,7 @@ if ($deployState -ne "Succeeded") {
 Write-Host "Azure infrastructure deployed successfully!" -ForegroundColor Green
 
 # Retrieve deployment outputs
-$deployOutputJson = az deployment group show `
-    --resource-group $ResourceGroupName `
+$deployOutputJson = az deployment sub show `
     --name $deploymentName `
     --query "properties.outputs" `
     --output json
@@ -279,6 +283,8 @@ Write-Host "Solutions created" -ForegroundColor Green
 Write-Host "`nDeployed Azure resources:" -ForegroundColor Cyan
 Write-Host "  Migrate Project:  $($deployOutput.migrateProjectName.value)" -ForegroundColor Gray
 Write-Host "  Target VNet:      $($deployOutput.targetVnetName.value)" -ForegroundColor Gray
+Write-Host "  PostgreSQL:       $($deployOutput.postgresServerFqdn.value)" -ForegroundColor Gray
+Write-Host "  DMS:              $($deployOutput.dmsName.value)" -ForegroundColor Gray
 
 # ============================================
 # Summary
@@ -287,7 +293,10 @@ Write-Host "`n=== Azure Migrate Deployment Complete ===" -ForegroundColor Yellow
 
 Write-Host "`nAzure Resources:" -ForegroundColor Yellow
 Write-Host "  - Migrate Project:  $($deployOutput.migrateProjectName.value)" -ForegroundColor Cyan
-Write-Host "  - Target VNet:      $($deployOutput.targetVnetName.value)" -ForegroundColor Cyan
+Write-Host "  - Target VNet:      $($deployOutput.targetVnetName.value) (in $($deployOutput.migrationTargetResourceGroupName.value))" -ForegroundColor Cyan
+Write-Host "  - VNet Peering:     vnet-dc <-> vnet-migrate-target" -ForegroundColor Cyan
+Write-Host "  - PostgreSQL:       $($deployOutput.postgresServerFqdn.value) (in $($deployOutput.migrationTargetResourceGroupName.value))" -ForegroundColor Cyan
+Write-Host "  - Database Migration Service: $($deployOutput.dmsName.value)" -ForegroundColor Cyan
 
 Write-Host "`nAppliance VM on DC host:" -ForegroundColor Yellow
 Write-Host "  - Downloaded and imported into Hyper-V" -ForegroundColor Cyan

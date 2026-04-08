@@ -1,5 +1,13 @@
+targetScope = 'subscription'
+
 @description('Location for all resources')
-param location string = resourceGroup().location
+param location string
+
+@description('Name of the DC resource group (source)')
+param dcResourceGroupName string
+
+@description('Name of the migration target resource group')
+param migrationTargetResourceGroupName string = 'rg-migration-target'
 
 @description('Base name for the Azure Migrate project (timestamp will be appended for uniqueness)')
 param migrateProjectBaseName string = 'migrate-project'
@@ -10,79 +18,113 @@ param vnetAddressPrefix string = '10.1.0.0/16'
 @description('Subnet address prefix for migrated VMs')
 param subnetAddressPrefix string = '10.1.0.0/24'
 
-@description('Name of the storage account for replication')
-param replicationStorageAccountName string = 'strepl${uniqueString(resourceGroup().id)}'
+@description('PostgreSQL server name')
+param postgresServerName string = 'psql-migrate-target-${uniqueString(subscription().subscriptionId, migrationTargetResourceGroupName)}'
 
-// Storage Account for replication
-resource replicationStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
-  name: replicationStorageAccountName
+@description('PostgreSQL administrator login')
+param postgresAdminLogin string = 'pgadmin'
+
+@secure()
+@description('PostgreSQL administrator password')
+param postgresAdminPassword string
+
+@description('PostgreSQL runtime server name')
+param postgresRuntimeServerName string = 'psql-migrate-runtime-${uniqueString(subscription().subscriptionId, migrationTargetResourceGroupName)}'
+
+// Create the migration target resource group
+resource migrationTargetRg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
+  name: migrationTargetResourceGroupName
   location: location
-  sku: {
-    name: 'Standard_LRS'
-  }
-  kind: 'StorageV2'
-  properties: {
-    allowBlobPublicAccess: false
-    minimumTlsVersion: 'TLS1_2'
-    supportsHttpsTrafficOnly: true
-  }
-  tags: {
-    Environment: 'Migration'
-    Purpose: 'Replication'
+}
+
+// Deploy the migration target VNet into the new resource group
+module targetVnet 'modules/migration-target-vnet.bicep' = {
+  name: 'migration-target-vnet'
+  scope: migrationTargetRg
+  params: {
+    location: location
+    vnetAddressPrefix: vnetAddressPrefix
+    subnetAddressPrefix: subnetAddressPrefix
   }
 }
 
-// Virtual Network for migrated VMs
-resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
-  name: 'vnet-migrate-target'
-  location: location
-  properties: {
-    addressSpace: {
-      addressPrefixes: [
-        vnetAddressPrefix
-      ]
-    }
-    subnets: [
-      {
-        name: 'snet-migrated-vms'
-        properties: {
-          addressPrefix: subnetAddressPrefix
-        }
-      }
-    ]
+// Deploy PostgreSQL Flexible Server into the migration target resource group
+module postgresServer 'modules/postgres-flexible-server.bicep' = {
+  name: 'postgres-flexible-server'
+  scope: migrationTargetRg
+  params: {
+    location: location
+    serverName: postgresServerName
+    administratorLogin: postgresAdminLogin
+    administratorLoginPassword: postgresAdminPassword
   }
 }
 
-// Azure Migrate Project with System Assigned Identity
-resource migrateProject 'Microsoft.Migrate/migrateProjects@2020-05-01' = {
-  name: '${migrateProjectBaseName}-${uniqueString(resourceGroup().id)}'
-  location: location
-  #disable-next-line BCP187
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    publicNetworkAccess: 'Enabled'
-  }
-  #disable-next-line BCP187
-  tags: {
-    Environment: 'Migration'
-    Purpose: 'Azure Migrate Workshop'
+// Deploy Private DNS Zone for PostgreSQL runtime server
+module postgresDnsZone 'modules/postgres-private-dns.bicep' = {
+  name: 'postgres-private-dns'
+  scope: migrationTargetRg
+  params: {
+    vnetId: targetVnet.outputs.vnetId
   }
 }
 
-// Solutions are created via ARM deployment since Bicep doesn't have direct resource type
-// We use deploymentScripts or nested templates. For simplicity, we'll create them via REST in the deploy script.
-// The migrate project needs these solutions to function properly:
-// - Servers-Assessment-ServerAssessment
-// - Servers-Discovery-ServerDiscovery
-// - Servers-Migration-ServerMigration
+// Deploy PostgreSQL runtime server (VNet integrated) for database migration
+module postgresRuntimeServer 'modules/postgres-flexible-server.bicep' = {
+  name: 'postgres-runtime-server'
+  scope: migrationTargetRg
+  params: {
+    location: location
+    serverName: postgresRuntimeServerName
+    administratorLogin: postgresAdminLogin
+    administratorLoginPassword: postgresAdminPassword
+    delegatedSubnetResourceId: targetVnet.outputs.postgresMigrateSubnetId
+    privateDnsZoneArmResourceId: postgresDnsZone.outputs.dnsZoneId
+  }
+}
+
+// Deploy the Azure Migrate project + storage into the DC resource group
+module migrateResources 'modules/migrate-resources.bicep' = {
+  name: 'migrate-resources'
+  scope: resourceGroup(dcResourceGroupName)
+  params: {
+    location: location
+    migrateProjectBaseName: migrateProjectBaseName
+  }
+}
+
+// Peering: vnet-migrate-target -> vnet-dc
+module peeringTargetToDc 'modules/vnet-peering.bicep' = {
+  name: 'peering-target-to-dc'
+  scope: migrationTargetRg
+  params: {
+    localVnetName: targetVnet.outputs.vnetName
+    remoteVnetId: resourceId(subscription().subscriptionId, dcResourceGroupName, 'Microsoft.Network/virtualNetworks', 'vnet-dc')
+    peeringName: 'peer-to-vnet-dc'
+  }
+}
+
+// Peering: vnet-dc -> vnet-migrate-target
+module peeringDcToTarget 'modules/vnet-peering.bicep' = {
+  name: 'peering-dc-to-target'
+  scope: resourceGroup(dcResourceGroupName)
+  params: {
+    localVnetName: 'vnet-dc'
+    remoteVnetId: targetVnet.outputs.vnetId
+    peeringName: 'peer-to-vnet-migrate-target'
+  }
+}
 
 // Outputs
-output migrateProjectId string = migrateProject.id
-output migrateProjectName string = migrateProject.name
-output targetVnetId string = vnet.id
-output targetVnetName string = vnet.name
-output targetSubnetId string = vnet.properties.subnets[0].id
-output replicationStorageAccountId string = replicationStorage.id
-output replicationStorageAccountName string = replicationStorage.name
+output migrateProjectId string = migrateResources.outputs.migrateProjectId
+output migrateProjectName string = migrateResources.outputs.migrateProjectName
+output targetVnetId string = targetVnet.outputs.vnetId
+output targetVnetName string = targetVnet.outputs.vnetName
+output targetSubnetId string = targetVnet.outputs.subnetId
+output replicationStorageAccountId string = migrateResources.outputs.replicationStorageAccountId
+output replicationStorageAccountName string = migrateResources.outputs.replicationStorageAccountName
+output migrationTargetResourceGroupName string = migrationTargetRg.name
+output postgresServerName string = postgresServer.outputs.serverName
+output postgresServerFqdn string = postgresServer.outputs.serverFqdn
+output postgresRuntimeServerName string = postgresRuntimeServer.outputs.serverName
+output postgresRuntimeServerFqdn string = postgresRuntimeServer.outputs.serverFqdn
