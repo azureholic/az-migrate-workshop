@@ -18,6 +18,7 @@ Install the following on the participant's laptop or workstation:
 | **PowerShell (pwsh)** | PowerShell 7+ (cross-platform) | [https://aka.ms/install-powershell](https://aka.ms/install-powershell) |
 | **Azure CLI** | Azure command-line interface | [https://aka.ms/installazurecli](https://aka.ms/installazurecli) |
 | **Git** | Git command-line interface | [https://git-scm.com/downloads](https://git-scm.com/downloads) |
+| **RDP Client** | Remote Desktop client (mstsc is built-in on Windows) | [https://learn.microsoft.com/en-us/windows-server/remote/remote-desktop-services/clients/remote-desktop-clients](https://learn.microsoft.com/en-us/windows-server/remote/remote-desktop-services/clients/remote-desktop-clients) |
 
 ## Environment Setup
 
