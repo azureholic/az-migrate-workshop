@@ -17,10 +17,20 @@ Install the following on the participant's laptop or workstation:
 |------|-------------|----------|
 | **PowerShell (pwsh)** | PowerShell 7+ (cross-platform) | [https://aka.ms/install-powershell](https://aka.ms/install-powershell) |
 | **Azure CLI** | Azure command-line interface | [https://aka.ms/installazurecli](https://aka.ms/installazurecli) |
+| **Git** | Git command-line interface | [https://git-scm.com/downloads](https://git-scm.com/downloads) |
 
 ## Environment Setup
 
-### 1. Sign in to Azure
+### 1. Clone the Repository
+
+Open a PowerShell terminal and clone the workshop repository:
+
+```powershell
+git clone https://github.com/<org>/az-migrate-workshop.git
+cd az-migrate-workshop
+```
+
+### 2. Sign in to Azure
 
 Open a PowerShell terminal and sign in to the target subscription:
 
@@ -29,11 +39,11 @@ az login
 az account set --subscription "<subscription-id>"
 ```
 
-### 2. Configure Parameters
+### 3. Configure Parameters
 
 Edit `dc-infra/main.bicepparam` to set the desired resource group name, location, and admin password.
 
-### 3. Run the Setup Script
+### 4. Run the Setup Script
 
 From the repository root, run:
 
