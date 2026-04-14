@@ -4,25 +4,26 @@ A hands-on workshop for migrating on-premises Hyper-V workloads to Azure using A
 
 ---
 
-## Prerequisites
+## Part 0: Setting Up Your Environment
 
-- Azure subscription with Owner or Contributor access
-- Azure CLI installed
-- PowerShell 7+
-- Remote Desktop client (mstsc)
+### 0.1 Login to Azure
 
----
-
-## Part 1: Deploy the Workshop Environment
-
-### 1.1 Login to Azure
+Open a PowerShell terminal and authenticate:
 
 ```powershell
 az login
+```
+
+### 0.2 Select your subscription
+
+List your subscriptions and set the one you want to use:
+
+```powershell
+az account list --output table
 az account set --subscription <your-subscription-id>
 ```
 
-### 1.2 Run the environment setup
+### 0.3 Deploy the workshop environment
 
 From the repository root, run:
 
@@ -39,54 +40,61 @@ From the repository root, run:
 
 ---
 
-## Part 2: Connect to the VMs
+## Prerequisites
 
-### 2.1 Tunnel options
+- Azure subscription with Owner or Contributor access
+- Azure CLI installed
+- PowerShell 7+
+- Remote Desktop client (mstsc)
 
-The `tunnel.ps1` script creates a Bastion tunnel to access VMs via RDP:
+---
+
+## Part 1: Connect to the VMs
+
+### 1.1 Tunnel scripts
+
+Two scripts create Bastion tunnels and launch RDP automatically:
 
 ```powershell
-# Connect to Azure Migrate appliance (default) → localhost:33389
-.\tunnel.ps1
+# Connect to DC VM → localhost:33390
+.\tunnel-dc.ps1
 
-# Connect to DC VM directly → localhost:33390
-.\tunnel.ps1 -Target DC
+# Connect to Azure Migrate appliance → localhost:33389
+.\tunnel-appl.ps1
 ```
 
-### 2.2 Connect to the DC VM
+> **Tip:** The password is copied to your clipboard automatically — just **Ctrl+V** in the RDP prompt.
 
-1. Run the tunnel script targeting the DC:
+### 1.2 Connect to the DC VM
+
+1. Run the tunnel script:
    ```powershell
-   .\tunnel.ps1 -Target DC
+   .\tunnel-dc.ps1
    ```
-2. Open **Remote Desktop Connection** (mstsc)
-3. Connect to `localhost:33390`
-4. Login with credentials:
-   - **Username:** `azureuser`
-   - **Password:** `$uper$ecretP@ssw0rd`
+2. RDP opens automatically to `localhost:33390`
+3. Paste the password (**Ctrl+V**) when prompted
 
-### 2.3 Connect to the Azure Migrate appliance
+### 1.3 Connect to the Azure Migrate appliance
 
-1. Run the tunnel script (defaults to AzMigrate):
+1. Run the tunnel script:
    ```powershell
-   .\tunnel.ps1
+   .\tunnel-appl.ps1
    ```
-2. Open **Remote Desktop Connection** (mstsc)
-3. Connect to `localhost:33389`
-4. Login with the appliance credentials
+2. RDP opens automatically to `localhost:33389`
+3. Login with the appliance credentials
 
-### 2.4 Set the Azure Migrate appliance password
+### 1.4 Set the Azure Migrate appliance password
 
-1. Connect to the DC VM (section 2.2)
+1. Connect to the DC VM (section 1.2)
 2. Open **Hyper-V Manager** on the DC VM
 3. Connect to the **az-migrate** VM
 4. Set a password for the Administrator account when prompted
 
-> **Tip:** After setting the appliance password, you can connect directly to it using `.\tunnel.ps1` (section 2.3)
+> **Tip:** After setting the appliance password, you can connect directly to it using `.\tunnel-appl.ps1` (section 1.3)
 
 ---
 
-## Part 3: Generate the Azure Migrate Appliance Key
+## Part 2: Generate the Azure Migrate Appliance Key
 
 ### 3.1 In the Azure Portal
 
@@ -101,9 +109,9 @@ The `tunnel.ps1` script creates a Bastion tunnel to access VMs via RDP:
 
 ---
 
-## Part 4: Configure the Azure Migrate Appliance
+## Part 3: Configure the Azure Migrate Appliance
 
-Connect to the appliance using `.\tunnel.ps1` and RDP to `localhost:33389` (see section 2.3).
+Connect to the appliance using `.\tunnel-appl.ps1` (see section 1.3).
 
 ### 4.1 Set up prerequisites
 
@@ -185,7 +193,7 @@ Click **Add more**, then add:
 
 | VM | IP Address | Access |
 |----|------------|--------|
-| az-migrate | 192.168.100.10 (reserved) | RDP via `.\tunnel.ps1` → localhost:33389 |
+| az-migrate | 192.168.100.10 (reserved) | RDP via `.\tunnel-appl.ps1` → localhost:33389 |
 | adds-vm | 192.168.100.20 (reserved) | RDP from DC VM (Domain Controller) |
 | webapp-vm | DHCP (192.168.100.x) | SSH or HTTP:3000 from DC VM |
 | ubuntu-vm | DHCP (192.168.100.x) | SSH from DC VM |

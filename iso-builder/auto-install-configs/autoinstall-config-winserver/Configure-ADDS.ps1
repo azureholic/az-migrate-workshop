@@ -29,22 +29,29 @@ function Configure-WinRM {
         Set-Item WSMan:\localhost\Client\TrustedHosts -Value '*' -Force
         Set-Item WSMan:\localhost\Service\MaxMemoryPerShellMB -Value 1024 -Force
 
+        # Allow remote admin from non-domain machines (required for Azure Migrate appliance)
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' `
+            -Name 'LocalAccountTokenFilterPolicy' -Value 1 -Type DWord -Force
+
         # Ensure WinRM service is running and set to auto-start
         Set-Service WinRM -StartupType Automatic
         Start-Service WinRM -ErrorAction SilentlyContinue
         winrm quickconfig -quiet 2>&1 | Out-Null
 
-        # Create HTTPS listener with self-signed certificate
-        $existingHttps = Get-ChildItem WSMan:\localhost\Listener | Where-Object { $_.Keys -contains 'Transport=HTTPS' }
-        if (-not $existingHttps) {
-            $hostname = [System.Net.Dns]::GetHostName()
-            $cert = New-SelfSignedCertificate -DnsName $hostname, "DC01", "DC01.migrate.local" `
-                -CertStoreLocation Cert:\LocalMachine\My -NotAfter (Get-Date).AddYears(5)
-            winrm create winrm/config/Listener?Address=*+Transport=HTTPS "@{Hostname=`"$hostname`";CertificateThumbprint=`"$($cert.Thumbprint)`"}" 2>&1 | Out-Null
-            Write-Log "WinRM HTTPS listener created with certificate: $($cert.Thumbprint)"
-        } else {
-            Write-Log "WinRM HTTPS listener already exists."
+        # Create/recreate HTTPS listener with self-signed certificate (include adds-vm and IP SANs)
+        # Always recreate because domain promotion can wipe the HTTPS listener
+        $existingHttps = Get-ChildItem WSMan:\localhost\Listener -ErrorAction SilentlyContinue | Where-Object { $_.Keys -contains 'Transport=HTTPS' }
+        if ($existingHttps) {
+            $existingHttps | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Log "Removed existing HTTPS listener (will recreate with correct SANs)."
         }
+        $hostname = [System.Net.Dns]::GetHostName()
+        $cert = New-SelfSignedCertificate `
+            -DnsName $hostname, "DC01", "DC01.migrate.local", "adds-vm", "adds-vm.migrate.local" `
+            -TextExtension @("2.5.29.17={text}IPAddress=192.168.100.20") `
+            -CertStoreLocation Cert:\LocalMachine\My -NotAfter (Get-Date).AddYears(5)
+        winrm create winrm/config/Listener?Address=*+Transport=HTTPS "@{Hostname=`"$hostname`";CertificateThumbprint=`"$($cert.Thumbprint)`"}" 2>&1 | Out-Null
+        Write-Log "WinRM HTTPS listener created with certificate: $($cert.Thumbprint)"
 
         # Open firewall rules for WinRM HTTP and HTTPS
         netsh advfirewall firewall set rule group="Windows Remote Management" new enable=yes 2>&1 | Out-Null
@@ -83,8 +90,23 @@ if ((Get-WmiObject Win32_ComputerSystem).PartOfDomain -and (Get-ADDomainControll
     Write-Log "Re-applying WinRM configuration post domain promotion..."
     Configure-WinRM
 
-    # Configure DNS forwarder to Azure DNS for non-migrate.local queries
-    Write-Log "Configuring DNS forwarder to Azure DNS (168.63.129.16)..."
+    # Add DNS A record for 'adds-vm' so Azure Migrate can resolve the Hyper-V display name
+    Write-Log "Adding DNS A record for adds-vm -> 192.168.100.20..."
+    try {
+        $existingRecord = Get-DnsServerResourceRecord -ZoneName "migrate.local" -Name "adds-vm" -RRType A -ErrorAction SilentlyContinue
+        if (-not $existingRecord) {
+            Add-DnsServerResourceRecordA -ZoneName "migrate.local" -Name "adds-vm" -IPv4Address "192.168.100.20" -ErrorAction Stop
+            Write-Log "DNS A record added: adds-vm.migrate.local -> 192.168.100.20"
+        } else {
+            Write-Log "DNS A record for adds-vm already exists."
+        }
+    }
+    catch {
+        Write-Log "WARNING: Failed to add DNS record for adds-vm: $_"
+    }
+
+    # Configure DNS forwarder to Cloudflare DNS for non-migrate.local queries
+    Write-Log "Configuring DNS forwarder to Cloudflare DNS (1.1.1.1)..."
     try {
         # Remove all existing forwarders (clears default fec0 IPv6 addresses)
         $existing = Get-DnsServerForwarder -ErrorAction SilentlyContinue
@@ -94,9 +116,9 @@ if ((Get-WmiObject Win32_ComputerSystem).PartOfDomain -and (Get-ADDomainControll
                 Write-Log "Removed existing forwarder: $ip"
             }
         }
-        # Add Azure DNS as the sole forwarder
-        Add-DnsServerForwarder -IPAddress "168.63.129.16" -ErrorAction Stop
-        Write-Log "DNS forwarder to Azure DNS (168.63.129.16) added successfully."
+        # Add Cloudflare DNS as the sole forwarder
+        Add-DnsServerForwarder -IPAddress "1.1.1.1" -ErrorAction Stop
+        Write-Log "DNS forwarder to Cloudflare DNS (1.1.1.1) added successfully."
     }
     catch {
         Write-Log "WARNING: Failed to configure DNS forwarder: $_"
@@ -135,9 +157,24 @@ try {
         # Re-apply WinRM config (domain promotion can reset WinRM settings)
         Write-Log "Re-applying WinRM configuration post domain promotion..."
         Configure-WinRM
+
+        # Add DNS A record for 'adds-vm' so Azure Migrate can resolve the Hyper-V display name
+        Write-Log "Adding DNS A record for adds-vm -> 192.168.100.20..."
+        try {
+            $existingRecord = Get-DnsServerResourceRecord -ZoneName "migrate.local" -Name "adds-vm" -RRType A -ErrorAction SilentlyContinue
+            if (-not $existingRecord) {
+                Add-DnsServerResourceRecordA -ZoneName "migrate.local" -Name "adds-vm" -IPv4Address "192.168.100.20" -ErrorAction Stop
+                Write-Log "DNS A record added: adds-vm.migrate.local -> 192.168.100.20"
+            } else {
+                Write-Log "DNS A record for adds-vm already exists."
+            }
+        }
+        catch {
+            Write-Log "WARNING: Failed to add DNS record for adds-vm: $_"
+        }
         
-        # Configure DNS forwarder to Azure DNS for non-migrate.local queries
-        Write-Log "Configuring DNS forwarder to Azure DNS (168.63.129.16)..."
+        # Configure DNS forwarder to Cloudflare DNS for non-migrate.local queries
+        Write-Log "Configuring DNS forwarder to Cloudflare DNS (1.1.1.1)..."
         try {
             # Remove all existing forwarders (clears default fec0 IPv6 addresses)
             $existing = Get-DnsServerForwarder -ErrorAction SilentlyContinue
@@ -147,9 +184,9 @@ try {
                     Write-Log "Removed existing forwarder: $ip"
                 }
             }
-            # Add Azure DNS as the sole forwarder
-            Add-DnsServerForwarder -IPAddress "168.63.129.16" -ErrorAction Stop
-            Write-Log "DNS forwarder to Azure DNS (168.63.129.16) added successfully."
+            # Add Cloudflare DNS as the sole forwarder
+            Add-DnsServerForwarder -IPAddress "1.1.1.1" -ErrorAction Stop
+            Write-Log "DNS forwarder to Cloudflare DNS (1.1.1.1) added successfully."
         }
         catch {
             Write-Log "WARNING: Failed to configure DNS forwarder: $_"

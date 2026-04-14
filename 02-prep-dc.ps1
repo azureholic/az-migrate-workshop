@@ -3,19 +3,20 @@
 # for nested virtualization in Azure
 
 param(
-    [string]$ResourceGroupName = "rg-migrate-workshop",
-    [string]$VMName = "vm-dc",
-    [string]$MigrateResourceGroupName = "rg-migrate-workshop",
-    [string]$VaultName = "rsv-migrate"
+    [string]$ResourceGroupName,
+    [string]$VMName = "vm-dc"
 )
 
 $ErrorActionPreference = "Stop"
 
+# Read config from dc-infra\main.bicepparam (single source of truth)
+$bicepParamFile = Join-Path $PSScriptRoot "dc-infra\main.bicepparam"
+$bicepContent = Get-Content $bicepParamFile -Raw
+if (-not $ResourceGroupName) { $ResourceGroupName = [regex]::Match($bicepContent, "param resourceGroupName = '([^']+)'").Groups[1].Value }
+
 Write-Host "`n=== Azure Migration Workshop - Prepare DC VM ===" -ForegroundColor Yellow
 Write-Host "Resource Group: $ResourceGroupName" -ForegroundColor Cyan
-Write-Host "VM Name: $VMName" -ForegroundColor Cyan
-Write-Host "Migrate RG: $MigrateResourceGroupName" -ForegroundColor Cyan
-Write-Host "Vault Name: $VaultName`n" -ForegroundColor Cyan
+Write-Host "VM Name: $VMName`n" -ForegroundColor Cyan
 
 # ============================================
 # 1. Check if Hyper-V is already enabled
@@ -306,10 +307,10 @@ try {
 }
 
 # ============================================
-# 5. Configure Port Forwarding for Bastion Tunneling
+# 5. Configure Port Forwarding for Bastion Tunneling & DMS
 # ============================================
-Write-Host "`n[4/6] Configuring port forwarding for az-migrate appliance..." -ForegroundColor Yellow
-Write-Host "Note: Enables RDP access via Bastion tunnel`n" -ForegroundColor Cyan
+Write-Host "`n[4/6] Configuring port forwarding..." -ForegroundColor Yellow
+Write-Host "Note: Enables RDP access via Bastion tunnel and PostgreSQL access for DMS`n" -ForegroundColor Cyan
 
 $configurePortForwardingScript = @'
 $ErrorActionPreference = 'Stop'
@@ -342,8 +343,28 @@ Remove-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
 New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -LocalPort $ExternalPort -Protocol TCP -Action Allow | Out-Null
 Write-Host "  Firewall rule added: $ruleName"
 
+# Port forwarding for webapp-vm PostgreSQL (for Azure Database Migration Service)
+# webapp-vm gets 192.168.100.30 via DHCP reservation
+$PgExternalPort = 5432
+$PgInternalIP = "192.168.100.30"
+$PgInternalPort = 5432
+
+$null = netsh interface portproxy delete v4tov4 listenport=$PgExternalPort listenaddress=0.0.0.0 2>&1
+$result = netsh interface portproxy add v4tov4 listenport=$PgExternalPort listenaddress=0.0.0.0 connectport=$PgInternalPort connectaddress=$PgInternalIP
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "Port forwarding: $PgExternalPort -> ${PgInternalIP}:${PgInternalPort} (webapp-vm PostgreSQL)"
+} else {
+    Write-Host "Warning: PostgreSQL port forwarding may not have been configured: $result"
+}
+
+$pgRuleName = "Allow-PostgreSQL-$PgExternalPort"
+Remove-NetFirewallRule -DisplayName $pgRuleName -ErrorAction SilentlyContinue
+New-NetFirewallRule -DisplayName $pgRuleName -Direction Inbound -LocalPort $PgExternalPort -Protocol TCP -Action Allow | Out-Null
+Write-Host "  Firewall rule added: $pgRuleName"
+
 Write-Host "`nPort Forwarding Configuration:"
 Write-Host "  $ExternalPort -> ${InternalIP}:${InternalPort} (az-migrate RDP)"
+Write-Host "  $PgExternalPort -> ${PgInternalIP}:${PgInternalPort} (webapp-vm PostgreSQL)"
 Write-Host "`nUse Bastion tunnel to access az-migrate appliance:"
 Write-Host "  az network bastion tunnel -n bastion-dc -g <rg> --target-resource-id <vm-dc-id> --resource-port $ExternalPort --port $ExternalPort"
 Write-Host "  Then RDP to localhost:$ExternalPort"
@@ -487,142 +508,14 @@ try {
 }
 
 # ============================================
-# 6. Install Azure Site Recovery Provider (includes MARS agent)
-# ============================================
-Write-Host "`n[6/6] Installing Azure Site Recovery Provider..." -ForegroundColor Yellow
-Write-Host "Note: Required for Hyper-V replication to Azure (includes MARS agent)`n" -ForegroundColor Cyan
-
-$installASRProviderScript = @'
-$ErrorActionPreference = 'Stop'
-
-$DownloadUrl = "https://aka.ms/downloaddra"
-$InstallerPath = "C:\Windows\Temp\AzureSiteRecoveryProvider.exe"
-$ExtractPath = "C:\Windows\Temp\ASRProvider"
-$ProviderInstallDir = "C:\Program Files\Microsoft Azure Site Recovery Provider"
-
-# Check if ASR Provider is already installed (check install directory and registry)
-if (Test-Path $ProviderInstallDir) {
-    Write-Host "Azure Site Recovery Provider is already installed at $ProviderInstallDir"
-    $asrService = Get-Service -Name "dra" -ErrorAction SilentlyContinue
-    if ($asrService) { Write-Host "Service status: $($asrService.Status)" }
-    exit 0
-}
-
-$regCheck = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -EA SilentlyContinue |
-    Where-Object { $_.DisplayName -match 'Azure Site Recovery' }
-if ($regCheck) {
-    Write-Host "Azure Site Recovery Provider is already installed: $($regCheck.DisplayName)"
-    exit 0
-}
-
-# Download the installer
-Write-Host "Downloading Azure Site Recovery Provider..."
-Write-Host "Source: $DownloadUrl"
-
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$ProgressPreference = 'SilentlyContinue'
-
-try {
-    Invoke-WebRequest -Uri $DownloadUrl -OutFile $InstallerPath -UseBasicParsing
-} catch {
-    Write-Host "ERROR: Failed to download ASR Provider: $($_.Exception.Message)"
-    exit 1
-}
-
-if (-not (Test-Path $InstallerPath)) {
-    Write-Host "ERROR: Installer not found after download"
-    exit 1
-}
-
-$fileSize = (Get-Item $InstallerPath).Length / 1MB
-Write-Host "Downloaded: $([math]::Round($fileSize, 2)) MB"
-
-# Extract the self-extracting archive first
-Write-Host "Extracting ASR Provider installer..."
-if (Test-Path $ExtractPath) { Remove-Item $ExtractPath -Recurse -Force }
-$extractProcess = Start-Process -FilePath $InstallerPath `
-    -ArgumentList "/x:$ExtractPath", "/q" `
-    -Wait -PassThru
-
-if ($extractProcess.ExitCode -ne 0) {
-    Write-Host "ERROR: Extraction failed with exit code $($extractProcess.ExitCode)"
-    exit 1
-}
-Write-Host "Extracted to $ExtractPath"
-
-# Run the MSI installer silently
-$msiFile = Join-Path $ExtractPath "asradapter.msi"
-
-if ($msiFile -and (Test-Path $msiFile)) {
-    Write-Host "Running MSI install: $msiFile"
-    $installProcess = Start-Process -FilePath "msiexec" `
-        -ArgumentList "/i", "`"$msiFile`"", "/qn" `
-        -Wait -PassThru
-
-    if ($installProcess.ExitCode -ne 0) {
-        Write-Host "WARNING: MSI install exited with code $($installProcess.ExitCode)"
-    }
-} else {
-    Write-Host "ERROR: Could not find asradapter.msi in $ExtractPath"
-    Get-ChildItem $ExtractPath -Recurse | ForEach-Object { Write-Host $_.FullName }
-    exit 1
-}
-
-# Verify installation
-if (Test-Path $ProviderInstallDir) {
-    Write-Host "Azure Site Recovery Provider installed successfully!"
-} else {
-    $asrService = Get-Service -Name "dra" -ErrorAction SilentlyContinue
-    if ($asrService) {
-        Write-Host "Azure Site Recovery Provider installed (service found)"
-    } else {
-        Write-Host "Installation completed - may require reboot to finalize"
-    }
-}
-
-# Clean up
-Remove-Item $InstallerPath -Force -ErrorAction SilentlyContinue
-Remove-Item $ExtractPath -Recurse -Force -ErrorAction SilentlyContinue
-
-Write-Host "ASR Provider installation complete"
-'@
-
-try {
-    $tempFile = [System.IO.Path]::GetTempFileName() + ".ps1"
-    $installASRProviderScript | Out-File -FilePath $tempFile -Encoding ASCII
-
-    $output = & az vm run-command invoke `
-        --resource-group $ResourceGroupName `
-        --name $VMName `
-        --command-id RunPowerShellScript `
-        --scripts "@$tempFile" `
-        --output json 2>$null
-
-    Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-
-    $result = ($output | ConvertFrom-Json).value
-    $stdOut = ($result | Where-Object { $_.code -like '*StdOut*' }).message
-    $stdErr = ($result | Where-Object { $_.code -like '*StdErr*' }).message
-
-    if ($stdOut) { Write-Host $stdOut -ForegroundColor Gray }
-    if ($stdErr) { Write-Host $stdErr -ForegroundColor Yellow }
-
-    Write-Host "ASR Provider installation complete!" -ForegroundColor Green
-} catch {
-    Write-Host "ERROR: Failed to install ASR Provider: $_" -ForegroundColor Red
-    Write-Host "You may need to install it manually from https://aka.ms/downloaddra" -ForegroundColor Yellow
-}
-
-# ============================================
 # Summary
 # ============================================
 Write-Host "`n=== Preparation Complete ===" -ForegroundColor Yellow
 Write-Host "Hyper-V is now enabled on the DC VM" -ForegroundColor Cyan
 Write-Host "NAT switch configured for nested VM internet access" -ForegroundColor Cyan
 Write-Host "DHCP server configured for automatic IP assignment" -ForegroundColor Cyan
-Write-Host "Port forwarding configured for az-migrate RDP (port 33389)" -ForegroundColor Cyan
+Write-Host "Port forwarding configured for az-migrate RDP (port 33389) and PostgreSQL (port 5432)" -ForegroundColor Cyan
 Write-Host "WinRM configured for Azure Migrate discovery and assessment" -ForegroundColor Cyan
-Write-Host "Azure Site Recovery Provider installed for Hyper-V replication (includes MARS agent)" -ForegroundColor Cyan
 Write-Host "`nNext Steps:" -ForegroundColor Yellow
 Write-Host "1. Run 03-deploy-adds.ps1 to deploy the ADDS VM (DNS server)" -ForegroundColor Cyan
 Write-Host "2. Run 04-deploy-azure-migrate.ps1 to deploy Azure Migrate appliance" -ForegroundColor Cyan

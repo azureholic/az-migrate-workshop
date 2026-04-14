@@ -3,13 +3,18 @@
 # Uses a pre-built autoinstall ISO - single ISO, fully automated.
 
 param(
-    [string]$ResourceGroupName = "rg-migrate-workshop",
+    [string]$ResourceGroupName,
     [string]$VMName = "vm-dc",
     [string]$ScriptsPath = ".\dc-scripts\adds-vm",
     [string]$VMFilesPath = "C:\dc-files"
 )
 
 $ErrorActionPreference = "Stop"
+
+# Read config from dc-infra\main.bicepparam (single source of truth)
+$bicepParamFile = Join-Path $PSScriptRoot "dc-infra\main.bicepparam"
+$bicepContent = Get-Content $bicepParamFile -Raw
+if (-not $ResourceGroupName) { $ResourceGroupName = [regex]::Match($bicepContent, "param resourceGroupName = '([^']+)'").Groups[1].Value }
 
 Write-Host "`n=== Azure Migration Workshop - Deploy Windows Server 2019 ADDS VM ===" -ForegroundColor Yellow
 Write-Host "Resource Group: $ResourceGroupName" -ForegroundColor Cyan

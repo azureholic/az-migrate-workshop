@@ -1,5 +1,6 @@
 using './main.bicep'
 
+param resourceGroupName = 'rg-migrate-ws'
 param location = 'swedencentral'
 param adminUsername = 'azureuser'
 param adminPassword = '$uper$ecretP@ssw0rd' // Set your password here or pass via CLI

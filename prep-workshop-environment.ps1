@@ -2,12 +2,18 @@
 # This script runs all orchestrators in sequence to set up the complete workshop environment
 
 param(
-    [string]$ResourceGroupName = "rg-migrate-workshop",
-    [string]$Location = "swedencentral"
+    [string]$ResourceGroupName,
+    [string]$Location
 )
 
 $ErrorActionPreference = "Stop"
 $scriptDir = $PSScriptRoot
+
+# Read config from dc-infra\main.bicepparam (single source of truth)
+$bicepParamFile = Join-Path $PSScriptRoot "dc-infra\main.bicepparam"
+$bicepContent = Get-Content $bicepParamFile -Raw
+if (-not $ResourceGroupName) { $ResourceGroupName = [regex]::Match($bicepContent, "param resourceGroupName = '([^']+)'").Groups[1].Value }
+if (-not $Location) { $Location = [regex]::Match($bicepContent, "param location = '([^']+)'").Groups[1].Value }
 
 Write-Host "`n" -NoNewline
 Write-Host "===============================================" -ForegroundColor Cyan
@@ -127,7 +133,7 @@ Write-Host "All ISOs and appliance pre-downloaded! ($(($stepTimings["Pre-downloa
 Write-Host "`n[5/8] Waiting for ADDS VM to finish installing (checking DNS forwarder)..." -ForegroundColor Yellow
 Write-Host "=========================================================================" -ForegroundColor Yellow
 Write-Host "The ADDS VM is auto-installing Windows Server 2019 + AD DS + DNS." -ForegroundColor Gray
-Write-Host "Polling every 60 seconds for DNS forwarder (Azure DNS 168.63.129.16)..." -ForegroundColor Gray
+Write-Host "Polling every 60 seconds for DNS forwarder (Cloudflare DNS 1.1.1.1)..." -ForegroundColor Gray
 Write-Host "The VM will reboot during installation - failed polls are expected.`n" -ForegroundColor Gray
 
 $stepStart = Get-Date
@@ -151,8 +157,8 @@ while (-not $addsReady -and $pollCount -lt $maxPolls) {
         if ($LASTEXITCODE -eq 0) {
             $checkResult = ($checkOutput | ConvertFrom-Json).value | Where-Object { $_.code -like '*StdOut*' } | Select-Object -ExpandProperty message
 
-            if ($checkResult -and $checkResult.Trim() -match '168\.63\.129\.16') {
-                Write-Host " DNS forwarder is set to Azure DNS!" -ForegroundColor Green
+            if ($checkResult -and $checkResult.Trim() -match '1\.1\.1\.1') {
+                Write-Host " DNS forwarder is set to Cloudflare DNS!" -ForegroundColor Green
                 $addsReady = $true
             } else {
                 Write-Host " Not ready yet (got: $($checkResult.Trim()))" -ForegroundColor Yellow

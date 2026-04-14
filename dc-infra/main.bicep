@@ -1,3 +1,7 @@
+@description('Resource group name - used by deployment scripts as single source of truth')
+#disable-next-line no-unused-params
+param resourceGroupName string = resourceGroup().name
+
 @description('Location for all resources')
 param location string = resourceGroup().location
 
@@ -38,6 +42,19 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2024-05-01' = {
           sourcePortRange: '*'
           destinationAddressPrefix: '*'
           destinationPortRange: '3389'
+        }
+      }
+      {
+        name: 'Allow-PostgreSQL-From-MigrationTarget'
+        properties: {
+          priority: 120
+          direction: 'Inbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourceAddressPrefix: '10.1.0.0/16'  // vnet-migrate-target (peered)
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRange: '5432'
         }
       }
     ]
