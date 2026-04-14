@@ -26,7 +26,7 @@ Install the following on the participant's laptop or workstation:
 Open a PowerShell terminal and clone the workshop repository:
 
 ```powershell
-git clone https://github.com/<org>/az-migrate-workshop.git
+git clone https://github.com/azureholic/az-migrate-workshop.git
 cd az-migrate-workshop
 ```
 
