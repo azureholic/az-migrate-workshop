@@ -64,3 +64,7 @@ This script will automatically:
 8. Deploy an Ubuntu VM in Hyper-V
 
 > **Note:** The full setup takes a while to complete. Ensure you have a stable internet connection throughout.
+
+> **Note:** Once the environment is set up, the `/workshop` folder contains a PowerPoint with the content and guidance for the workshop itself.
+
+
