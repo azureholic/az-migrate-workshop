@@ -18,7 +18,7 @@ Install the following on the participant's laptop or workstation:
 | **PowerShell (pwsh)** | PowerShell 7+ (cross-platform) | [https://aka.ms/install-powershell](https://aka.ms/install-powershell) |
 | **Azure CLI** | Azure command-line interface | [https://learn.microsoft.com/en-us/cli/azure/?view=azure-cli-latest](https://learn.microsoft.com/en-us/cli/azure/?view=azure-cli-latest) |
 | **Git** | Git command-line interface | [https://git-scm.com/downloads](https://git-scm.com/downloads) |
-| **RDP Client** | Remote Desktop client (mstsc is built-in on Windows) | Please find a RDP tool for your OS if your not using Windows. You cannot use the predefined tunnel-dc.ps1 and tunnel-appl.ps scripts in that case - but you can see how to setup a tunnel in those scripts. |
+| **RDP Client** | Remote Desktop client (mstsc is built-in on Windows) | Please find a RDP tool for your OS if your not using Windows. You cannot use the predefined tunnel-dc.ps1 and tunnel-appl.ps1 scripts in that case - but you can see how to setup a tunnel in those scripts. |
 
 ## Environment Setup
 
