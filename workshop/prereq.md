@@ -16,9 +16,9 @@ Install the following on the participant's laptop or workstation:
 | Tool | Description | Download |
 |------|-------------|----------|
 | **PowerShell (pwsh)** | PowerShell 7+ (cross-platform) | [https://aka.ms/install-powershell](https://aka.ms/install-powershell) |
-| **Azure CLI** | Azure command-line interface | [https://aka.ms/installazurecli](https://aka.ms/installazurecli) |
+| **Azure CLI** | Azure command-line interface | [https://learn.microsoft.com/en-us/cli/azure/?view=azure-cli-latest](https://learn.microsoft.com/en-us/cli/azure/?view=azure-cli-latest) |
 | **Git** | Git command-line interface | [https://git-scm.com/downloads](https://git-scm.com/downloads) |
-| **RDP Client** | Remote Desktop client (mstsc is built-in on Windows) | [https://learn.microsoft.com/en-us/windows-server/remote/remote-desktop-services/clients/remote-desktop-clients](https://learn.microsoft.com/en-us/windows-server/remote/remote-desktop-services/clients/remote-desktop-clients) |
+| **RDP Client** | Remote Desktop client (mstsc is built-in on Windows) | Please find a RDP tool for your OS if your not using Windows. You cannot use the predefined tunnel-dc.ps1 and tunnel-appl.ps scripts in that case - but you can see how to setup a tunnel in those scripts. |
 
 ## Environment Setup
 
@@ -46,7 +46,7 @@ Edit `dc-infra/main.bicepparam` to set the desired resource group name, location
 
 ### 4. Run the Setup Script
 
-From the repository root, run:
+From the **repository root**, run:
 
 ```powershell
 ./prep-workshop-environment.ps1
