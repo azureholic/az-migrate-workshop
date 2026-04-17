@@ -35,7 +35,7 @@ export default function BusinessCaseSlide({ index, project }) {
 
             <div className={styles.instructions}>
               <p>We're going to perform several migrations, starting with a <strong>lift and shift</strong>. But first, build a business case.</p>
-              <p>You can either use the <strong>Migration Agent</strong> or <strong>Generate a business case</strong> manually.</p>
+              <p>There is an <strong>AI assistant (Migration Agent)</strong> available that can guide you through this process, but for now we will choose <strong>"Build business case"</strong> manually to better understand the steps involved.</p>
             </div>
 
             <div className={styles.callout}>

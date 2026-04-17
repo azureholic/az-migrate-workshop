@@ -31,11 +31,12 @@ git clone https://github.com/azureholic/az-migrate-workshop.git
 cd az-migrate-workshop
 ```
 
-### 2. Sign in to Azure
+### 2. Add Bastion extension and sign in to Azure
 
-Open a PowerShell terminal and sign in to the target subscription:
+Open a PowerShell terminal. Install the bastion extension for the CLI and sign in to the target subscription:
 
 ```powershell
+az extension add --name bastion
 az login
 az account set --subscription "<subscription-id>"
 ```

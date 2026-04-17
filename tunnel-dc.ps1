@@ -14,6 +14,7 @@ $bicepContent = Get-Content $bicepParamFile -Raw
 if (-not $ResourceGroupName) { $ResourceGroupName = [regex]::Match($bicepContent, "param resourceGroupName = '([^']+)'").Groups[1].Value }
 
 $targetResourceId = az vm show --resource-group $ResourceGroupName --name $VMName --query id -o tsv
+Write-Host "Target Resource ID: $targetResourceId" -ForegroundColor Cyan
 
 # Read credentials from dc-infra\main.bicepparam
 $bicepParamFile = Join-Path $PSScriptRoot "dc-infra\main.bicepparam"

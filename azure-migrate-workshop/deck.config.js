@@ -1,4 +1,5 @@
 import CoverSlide from './src/slides/CoverSlide.jsx'
+import AzureLoginSlide from './src/slides/AzureLoginSlide.jsx'
 import ConnectApplianceSlide from './src/slides/ConnectApplianceSlide.jsx'
 import ConfigureApplianceSlide from './src/slides/ConfigureApplianceSlide.jsx'
 import ConnectApplianceRdpSlide from './src/slides/ConnectApplianceRdpSlide.jsx'
@@ -29,6 +30,7 @@ import ExecuteWaveSlide from './src/slides/ExecuteWaveSlide.jsx'
 import ReplicationSlide from './src/slides/ReplicationSlide.jsx'
 import MigrateLiftShiftSlide from './src/slides/MigrateLiftShiftSlide.jsx'
 import DatabaseMigrationSlide from './src/slides/DatabaseMigrationSlide.jsx'
+import AddProductDataSlide from './src/slides/AddProductDataSlide.jsx'
 import DbMigrateSetupSlide from './src/slides/DbMigrateSetupSlide.jsx'
 import DbMigrateRuntimeSlide from './src/slides/DbMigrateRuntimeSlide.jsx'
 import DbMigrateSourceSlide from './src/slides/DbMigrateSourceSlide.jsx'
@@ -54,6 +56,7 @@ export default {
   order: 1,
   slides: [
     CoverSlide,
+    AzureLoginSlide,
     ConnectApplianceSlide,
     ConfigureApplianceSlide,
     ConnectApplianceRdpSlide,
@@ -84,6 +87,7 @@ export default {
     ReplicationSlide,
     MigrateLiftShiftSlide,
     DatabaseMigrationSlide,
+    AddProductDataSlide,
     DbMigrateSetupSlide,
     DbMigrateRuntimeSlide,
     DbMigrateSourceSlide,
