@@ -58,6 +58,13 @@ export default function AppliancePrerequisitesSlide({ index, project }) {
             />
           </div>
         </div>
+
+        <div className={styles.note}>
+          <span className={styles.noteIcon}>⚠️</span>
+          <p className={styles.noteText}>
+            Keep the RDP session to the appliance <strong>open</strong> — you will need it for the next steps. Do not close it.
+          </p>
+        </div>
       </div>
 
       <BottomBar text="azure-migrate-workshop" />

@@ -34,7 +34,7 @@ export default function ConfigureApplianceSlide({ index, project }) {
               <div className={styles.stepContent}>
                 <h3 className={styles.stepTitle}>Find the Azure Migrate project</h3>
                 <p className={styles.stepDesc}>
-                  Go to resource group <strong>rg-migrate-workshop</strong> and open the Azure Migrate project
+                  Go to resource group <strong>rg-migrate-ws</strong> and open the Azure Migrate project
                 </p>
               </div>
             </div>
@@ -61,6 +61,13 @@ export default function ConfigureApplianceSlide({ index, project }) {
               className={styles.screenshot}
             />
           </div>
+        </div>
+
+        <div className={styles.note}>
+          <span className={styles.noteIcon}>⚠️</span>
+          <p className={styles.noteText}>
+            Keep this browser window <strong>open</strong> — you will need it again in a later step.
+          </p>
         </div>
       </div>
 

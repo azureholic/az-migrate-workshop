@@ -1,4 +1,4 @@
-.configureAppliance {
+.azureLogin {
   background: var(--background);
   padding: 0 0 44px 0;
 }
@@ -71,30 +71,10 @@
   line-height: 1.5;
 }
 
-.columns {
+.steps {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 28px;
-  align-items: start;
-}
-
-.left {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.right {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.screenshot {
-  width: 100%;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-elevated);
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
 }
 
 .step {
@@ -103,10 +83,10 @@
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 22px;
+  padding: 24px;
   box-shadow: var(--shadow-elevated);
   display: flex;
-  gap: 14px;
+  gap: 16px;
   align-items: flex-start;
 }
 
@@ -123,13 +103,13 @@
 
 .stepNumber {
   flex-shrink: 0;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--accent), var(--cyan));
   color: white;
   font-weight: 800;
-  font-size: 15px;
+  font-size: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -156,17 +136,18 @@
   line-height: 1.5;
 }
 
-.list {
-  margin: 0;
-  padding-left: 18px;
+.code {
+  display: block;
+  margin-top: 4px;
+  padding: 8px 12px;
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 13px;
-  font-weight: 400;
-  color: var(--muted-foreground);
-  line-height: 1.7;
-}
-
-.list li strong {
-  color: var(--foreground);
+  font-weight: 500;
+  color: var(--accent);
+  word-break: break-all;
 }
 
 .note {
@@ -189,4 +170,11 @@
   font-weight: 400;
   color: var(--muted-foreground);
   line-height: 1.5;
+}
+
+.link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 500;
 }

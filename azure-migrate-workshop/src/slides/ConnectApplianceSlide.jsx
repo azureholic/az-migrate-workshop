@@ -27,7 +27,7 @@ export default function ConnectApplianceSlide({ index, project }) {
               </p>
               <code className={styles.code}>./tunnel-dc.ps1</code>
               <p className={styles.hint}>
-                A new terminal window opens for the tunnel — <strong>do not close it</strong>. The VM password is copied to your clipboard — paste with Ctrl+V at the RDP prompt.
+                A new terminal window opens for the tunnel — <strong>do not close it</strong>. Log in with user <strong>azureuser</strong> (it defaults to Administrator). The password is on your clipboard — paste with Ctrl+V at the RDP prompt.
               </p>
             </div>
           </div>
